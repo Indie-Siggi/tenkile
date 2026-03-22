@@ -448,6 +448,21 @@ The library should be embeddable in any web client. Keep it lightweight (<50KB m
 Will be embedded in the Go binary using the embed directive.
 ```
 
+### Phase 1 Checkpoint: Git Commit
+
+After completing all Phase 1 tasks (1.1–1.4), create a git commit:
+
+```bash
+git add -A
+git commit -m "Phase 1: Foundation — probe & cache
+
+Scaffold Go project, define codec types, implement probe receiver/validator/cache,
+and build client-side probe library.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push origin main
+```
+
 ---
 
 ## Phase 2: Server Inventory + Decision Engine
@@ -644,6 +659,21 @@ Create in internal/transcode/:
        HDR preservation %, avg trust, failure rate)
 ```
 
+### Phase 2 Checkpoint: Git Commit
+
+After completing all Phase 2 tasks (2.1–2.3), create a git commit:
+
+```bash
+git add -A
+git commit -m "Phase 2: Server inventory + decision engine
+
+Implement server capability discovery, quality-preserving transcode decision
+engine, and decision audit logger.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push origin main
+```
+
 ---
 
 ## Phase 3: Curated Device DB + Playback Feedback Loop
@@ -712,6 +742,21 @@ Create in internal/probes/:
    - After playback failure: mark device for re-probe on next connection
    - If 3+ failures for same codec: reduce trust to 0 and stop recommending
    - If curated DB says supported but feedback says failed: log discrepancy
+```
+
+### Phase 3 Checkpoint: Git Commit
+
+After completing all Phase 3 tasks (3.1–3.2), create a git commit:
+
+```bash
+git add -A
+git commit -m "Phase 3: Curated device DB + playback feedback loop
+
+Build curated Smart TV database and implement playback feedback loop for
+trust score refinement.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push origin main
 ```
 
 ---
@@ -1168,6 +1213,21 @@ Tests:
   - Docker build: verify image builds and binary starts (CI integration test)
 ```
 
+### Phase 4 Checkpoint: Git Commit
+
+After completing all Phase 4 tasks (4.1–4.7), create a git commit:
+
+```bash
+git add -A
+git commit -m "Phase 4: Media library, streaming, web UI & deployment
+
+Implement media scanner, HLS streaming, OpenAPI spec, auth/first-run setup,
+Preact web client, WebSocket events, and Docker deployment.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push origin main
+```
+
 ---
 
 ## Phase 5: Client Adapters + Native Probes
@@ -1206,6 +1266,21 @@ Create in internal/clients/:
 
 For now: implement the adapter interface and WebClientAdapter.
 Native probe stubs document what each platform API provides.
+```
+
+### Phase 5 Checkpoint: Git Commit
+
+After completing all Phase 5 tasks (5.1), create a git commit:
+
+```bash
+git add -A
+git commit -m "Phase 5: Client adapters + native probe stubs
+
+Implement client adapter interface, web adapter, and platform-specific
+probe library stubs (Android, iOS/tvOS).
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+git push origin main
 ```
 
 ---
