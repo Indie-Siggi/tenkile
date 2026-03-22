@@ -1,0 +1,44 @@
+# Build outputs
+dist/
+*.exe
+tenkile
+
+# Data files
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Web build output
+web/dist/
+web/node_modules/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage.out
+coverage.html
+
+# Temporary files
+tmp/
+temp/

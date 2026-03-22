@@ -1,0 +1,1039 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2024 Tenkile Contributors
+
+openapi: 3.1.0
+info:
+  title: Tenkile Media Server API
+  description: |
+    Tenkile is a modern, self-hosted media server with intelligent device probing,
+    adaptive transcoding, and curated device support.
+
+    This API provides endpoints for:
+    - Device probing and capability detection
+    - Playback decisions and transcoding
+    - Media library management
+    - User and authentication management
+    - Admin operations
+
+  version: 1.0.0
+  contact:
+    name: Tenkile Team
+    url: https://github.com/tenkile/tenkile
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://tenkile.example.com/api/v1
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check and status endpoints
+  - name: Probe
+    description: Device capability probing endpoints
+  - name: Playback
+    description: Playback decision and feedback endpoints
+  - name: Library
+    description: Media library management endpoints
+  - name: Devices
+    description: Device registration and management endpoints
+  - name: Users
+    description: User management endpoints
+  - name: Admin
+    description: Administrative endpoints
+
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check endpoint
+      description: Returns the health status of the server
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /openapi.yaml:
+    get:
+      operationId: getOpenAPI
+      summary: Get OpenAPI specification
+      description: Returns the OpenAPI specification document
+      tags:
+        - Health
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /probe/report:
+    post:
+      operationId: probeReport
+      summary: Submit probe report
+      description: Submit device capability probe results
+      tags:
+        - Probe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProbeReport'
+      responses:
+        '200':
+          description: Probe report accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeResponse'
+        '400':
+          description: Invalid probe data
+        '500':
+          description: Server error
+
+  /probe/scenarios:
+    get:
+      operationId: probeScenarios
+      summary: Get probe scenarios
+      description: Returns available probe scenarios for device testing
+      tags:
+        - Probe
+      responses:
+        '200':
+          description: List of probe scenarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenarios:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProbeScenario'
+
+  /playback/decision:
+    post:
+      operationId: playbackDecision
+      summary: Get playback decision
+      description: Request a playback decision for media based on device capabilities
+      tags:
+        - Playback
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaybackDecisionRequest'
+      responses:
+        '200':
+          description: Playback decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackDecision'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Media not found
+
+  /playback/feedback:
+    post:
+      operationId: playbackFeedback
+      summary: Submit playback feedback
+      description: Submit feedback about playback quality
+      tags:
+        - Playback
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaybackFeedback'
+      responses:
+        '200':
+          description: Feedback accepted
+        '401':
+          description: Unauthorized
+
+  /playback/history:
+    get:
+      operationId: playbackHistory
+      summary: Get playback history
+      description: Get playback history for the authenticated device
+      tags:
+        - Playback
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Playback history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackHistory'
+        '401':
+          description: Unauthorized
+
+  /library:
+    get:
+      operationId: listLibraries
+      summary: List libraries
+      description: Get all configured media libraries
+      tags:
+        - Library
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of libraries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  libraries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Library'
+        '401':
+          description: Unauthorized
+
+  /library/{libraryId}:
+    get:
+      operationId: getLibrary
+      summary: Get library
+      description: Get details for a specific library
+      tags:
+        - Library
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: libraryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Library details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Library'
+        '404':
+          description: Library not found
+
+  /library/{libraryId}/items:
+    get:
+      operationId: listLibraryItems
+      summary: List library items
+      description: Get items in a library
+      tags:
+        - Library
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: libraryId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of library items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LibraryItem'
+        '404':
+          description: Library not found
+
+  /library/{libraryId}/items/{itemId}:
+    get:
+      operationId: getLibraryItem
+      summary: Get library item
+      description: Get details for a specific library item
+      tags:
+        - Library
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: libraryId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Library item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryItem'
+        '404':
+          description: Item not found
+
+  /devices:
+    get:
+      operationId: listDevices
+      summary: List devices
+      description: Get all registered devices
+      tags:
+        - Devices
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
+        '401':
+          description: Unauthorized
+
+  /devices/{deviceId}:
+    get:
+      operationId: getDevice
+      summary: Get device
+      description: Get details for a specific device
+      tags:
+        - Devices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '404':
+          description: Device not found
+
+  /devices/{deviceId}/capabilities:
+    get:
+      operationId: getDeviceCapabilities
+      summary: Get device capabilities
+      description: Get capabilities for a specific device
+      tags:
+        - Devices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCapabilities'
+        '404':
+          description: Device not found
+
+  /devices/{deviceId}:
+    patch:
+      operationId: updateDevice
+      summary: Update device
+      description: Update device information
+      tags:
+        - Devices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceUpdate'
+      responses:
+        '200':
+          description: Device updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '404':
+          description: Device not found
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users
+      description: Get all users
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+    post:
+      operationId: createUser
+      summary: Create user
+      description: Create a new user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+        '401':
+          description: Unauthorized
+
+  /users/{userId}:
+    get:
+      operationId: getUser
+      summary: Get user
+      description: Get details for a specific user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+
+    put:
+      operationId: updateUser
+      summary: Update user
+      description: Update user information
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+
+    delete:
+      operationId: deleteUser
+      summary: Delete user
+      description: Delete a user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: User deleted
+        '404':
+          description: User not found
+
+  /admin/stats:
+    get:
+      operationId: adminStats
+      summary: Get admin statistics
+      description: Get server statistics for admin dashboard
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Server statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+        '401':
+          description: Unauthorized
+
+  /admin/migrations:
+    post:
+      operationId: runMigrations
+      summary: Run database migrations
+      description: Execute pending database migrations
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Migrations completed
+        '401':
+          description: Unauthorized
+
+  /admin/curated-devices:
+    get:
+      operationId: listCuratedDevices
+      summary: List curated devices
+      description: Get curated device profiles
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of curated devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CuratedDevice'
+
+    post:
+      operationId: createCuratedDevice
+      summary: Create curated device
+      description: Add a new curated device profile
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuratedDeviceCreate'
+      responses:
+        '201':
+          description: Device created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CuratedDevice'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ProbeReport:
+      type: object
+      properties:
+        device_capabilities:
+          $ref: '#/components/schemas/DeviceCapabilities'
+        scenarios_run:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScenarioResult'
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        duration_ms:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    ProbeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ProbeScenario:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [video, audio]
+        bitrate:
+          type: integer
+        codec:
+          type: string
+
+    DeviceCapabilities:
+      type: object
+      properties:
+        identity:
+          $ref: '#/components/schemas/DeviceIdentity'
+        video_codecs:
+          type: array
+          items:
+            type: string
+        audio_codecs:
+          type: array
+          items:
+            type: string
+        subtitle_formats:
+          type: array
+          items:
+            type: string
+        container_formats:
+          type: array
+          items:
+            type: string
+        max_width:
+          type: integer
+        max_height:
+          type: integer
+        max_bitrate:
+          type: integer
+        supports_hdr:
+          type: boolean
+        supports_dolby_vision:
+          type: boolean
+        supports_dolby_atmos:
+          type: boolean
+        trust_level:
+          type: string
+          enum: [unknown, untrusted, low, medium, high, trusted]
+        trust_score:
+          type: number
+          format: float
+
+    DeviceIdentity:
+      type: object
+      properties:
+        device_id:
+          type: string
+        name:
+          type: string
+        model:
+          type: string
+        manufacturer:
+          type: string
+        platform:
+          type: object
+          properties:
+            type:
+              type: string
+            name:
+              type: string
+            os:
+              type: string
+            os_version:
+              type: string
+
+    ScenarioResult:
+      type: object
+      properties:
+        scenario_id:
+          type: string
+        passed:
+          type: boolean
+        direct_play:
+          type: boolean
+        bitrate:
+          type: integer
+        duration_ms:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    PlaybackDecisionRequest:
+      type: object
+      required:
+        - media_id
+        - device_id
+      properties:
+        media_id:
+          type: string
+        device_id:
+          type: string
+        requested_quality:
+          type: string
+
+    PlaybackDecision:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [direct_play, transcode_video, transcode_audio, transcode_container, transcode_all]
+        selected_profile:
+          type: string
+        video_codec:
+          type: string
+        audio_codec:
+          type: string
+        container:
+          type: string
+        bitrate:
+          type: integer
+        resolution:
+          type: string
+        url:
+          type: string
+
+    PlaybackFeedback:
+      type: object
+      required:
+        - playback_id
+        - quality_rating
+      properties:
+        playback_id:
+          type: integer
+        quality_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        had_buffering:
+          type: boolean
+        buffering_count:
+          type: integer
+        had_errors:
+          type: boolean
+        error_type:
+          type: string
+
+    PlaybackHistory:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaybackDecision'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Library:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+        item_count:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+
+    LibraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        duration_ms:
+          type: integer
+        year:
+          type: integer
+        poster_url:
+          type: string
+        backdrop_url:
+          type: string
+
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        model:
+          type: string
+        manufacturer:
+          type: string
+        platform:
+          type: string
+        is_trusted:
+          type: boolean
+        trust_score:
+          type: number
+        last_seen:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    DeviceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        is_trusted:
+          type: boolean
+        trust_score:
+          type: number
+
+    DeviceCapabilities:
+      type: object
+      properties:
+        device_id:
+          type: string
+        video_codecs:
+          type: array
+          items:
+            type: string
+        audio_codecs:
+          type: array
+          items:
+            type: string
+        max_resolution:
+          type: string
+        max_bitrate:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    UserCreate:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          format: password
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [user, viewer]
+          default: user
+
+    UserUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+
+    AdminStats:
+      type: object
+      properties:
+        total_devices:
+          type: integer
+        total_users:
+          type: integer
+        total_libraries:
+          type: integer
+        total_items:
+          type: integer
+        active_playbacks:
+          type: integer
+        uptime_seconds:
+          type: integer
+
+    CuratedDevice:
+      type: object
+      properties:
+        id:
+          type: integer
+        device_hash:
+          type: string
+        name:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        platform:
+          type: string
+        capabilities:
+          type: object
+        source:
+          type: string
+          enum: [community, official, curated]
+        votes_up:
+          type: integer
+        votes_down:
+          type: integer
+        verified:
+          type: boolean
+
+    CuratedDeviceCreate:
+      type: object
+      required:
+        - name
+        - platform
+        - capabilities
+      properties:
+        name:
+          type: string
+        manufacturer:
+          type: string
+        model:
+          type: string
+        platform:
+          type: string
+        capabilities:
+          type: object
+        source:
+          type: string
+          enum: [community, official, curated]

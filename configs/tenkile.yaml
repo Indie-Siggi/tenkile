@@ -1,0 +1,108 @@
+# Tenkile Server Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  shutdown_timeout: "30s"
+  tls:
+    enabled: false
+    cert_path: ""
+    key_path: ""
+
+database:
+  driver: "sqlite"
+  dsn: "./data/tenkile.db"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+
+libraries:
+  - name: "Movies"
+    path: "/media/movies"
+    type: "movies"
+    refresh_interval: "1h"
+  - name: "TV Shows"
+    path: "/media/tv"
+    type: "tv"
+    refresh_interval: "1h"
+  - name: "Music"
+    path: "/media/music"
+    type: "music"
+    refresh_interval: "6h"
+
+transcoding:
+  enabled: true
+  temp_dir: "./data/transcode"
+  max_concurrent: 4
+  max_bitrate: "20000000"
+  video_codecs:
+    - "h264"
+    - "hevc"
+    - "vp9"
+    - "av1"
+  audio_codecs:
+    - "aac"
+    - "mp3"
+    - "opus"
+    - "flac"
+  containers:
+    - "mp4"
+    - "mkv"
+    - "ts"
+
+probe:
+  enabled: true
+  timeout: "10s"
+  max_retries: 3
+  scenario_delay: "100ms"
+
+quality:
+  profiles:
+    - name: "auto"
+      max_width: 0
+      max_height: 0
+      max_bitrate: 0
+    - name: "4k"
+      max_width: 3840
+      max_height: 2160
+      max_bitrate: 20000000
+    - name: "1080p"
+      max_width: 1920
+      max_height: 1080
+      max_bitrate: 8000000
+    - name: "720p"
+      max_width: 1280
+      max_height: 720
+      max_bitrate: 4000000
+    - name: "480p"
+      max_width: 854
+      max_height: 480
+      max_bitrate: 1500000
+    - name: "360p"
+      max_width: 640
+      max_height: 360
+      max_bitrate: 800000
+
+auth:
+  jwt_secret: ""
+  jwt_expiry: "24h"
+  refresh_expiry: "720h"
+  api_key_header: "X-API-Key"
+  require_auth:
+    - "/api/v1/playback/*"
+    - "/api/v1/library/*"
+    - "/api/v1/admin/*"
+  public_paths:
+    - "/api/v1/probe/*"
+    - "/api/v1/health"
+    - "/api/v1/openapi.yaml"
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  include_timestamp: true
+  include_caller: false
