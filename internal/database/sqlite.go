@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -25,7 +26,7 @@ type SQLite struct {
 }
 
 // OpenSQLite opens a new SQLite database connection
-func OpenSQLite(dsn string) (*SQLite, error) {
+func OpenSQLite(dsn string, maxOpenConns, maxIdleConns int, connMaxLifetime time.Duration) (*SQLite, error) {
 	// Create data directory if it doesn't exist
 	if idx := strings.LastIndex(dsn, "/"); idx != -1 {
 		dir := dsn[:idx]
@@ -38,6 +39,11 @@ func OpenSQLite(dsn string) (*SQLite, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	// Configure connection pool
+	conn.SetMaxOpenConns(maxOpenConns)
+	conn.SetMaxIdleConns(maxIdleConns)
+	conn.SetConnMaxLifetime(connMaxLifetime)
 
 	// Enable foreign keys
 	if _, err := conn.Exec("PRAGMA foreign_keys = ON"); err != nil {

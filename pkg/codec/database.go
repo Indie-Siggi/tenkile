@@ -3,6 +3,8 @@
 
 package codec
 
+import "strings"
+
 // CodecType represents the type of codec
 type CodecType int
 
@@ -90,6 +92,11 @@ type Profiles struct {
 	MaxHeight   int    `json:"max_height"`
 	MaxBitrate  int64  `json:"max_bitrate"`
 	AudioBitrate int64 `json:"audio_bitrate"`
+}
+
+// Equal checks if two codec names refer to the same codec (case-insensitive).
+func Equal(a, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 // Codec database - map of codec name to codec definition

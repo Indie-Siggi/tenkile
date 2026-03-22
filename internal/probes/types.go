@@ -3,63 +3,10 @@
 
 package probes
 
-// TrustLevel represents the trust level of a device
-type TrustLevel int
-
-const (
-	// TrustLevelUnknown - Device not yet evaluated
-	TrustLevelUnknown TrustLevel = iota
-	// TrustLevelUntrusted - Device marked as untrusted
-	TrustLevelUntrusted
-	// TrustLevelLow - Low trust, limited capabilities assumed
-	TrustLevelLow
-	// TrustLevelMedium - Medium trust, standard capabilities
-	TrustLevelMedium
-	// TrustLevelHigh - High trust, full capabilities
-	TrustLevelHigh
-	// TrustLevelTrusted - Explicitly trusted device
-	TrustLevelTrusted
+import (
+	"fmt"
+	"time"
 )
-
-// String returns the string representation of TrustLevel
-func (t TrustLevel) String() string {
-	switch t {
-	case TrustLevelUnknown:
-		return "unknown"
-	case TrustLevelUntrusted:
-		return "untrusted"
-	case TrustLevelLow:
-		return "low"
-	case TrustLevelMedium:
-		return "medium"
-	case TrustLevelHigh:
-		return "high"
-	case TrustLevelTrusted:
-		return "trusted"
-	default:
-		return "unknown"
-	}
-}
-
-// ParseTrustLevel parses a string into TrustLevel
-func ParseTrustLevel(s string) TrustLevel {
-	switch s {
-	case "unknown":
-		return TrustLevelUnknown
-	case "untrusted":
-		return TrustLevelUntrusted
-	case "low":
-		return TrustLevelLow
-	case "medium":
-		return TrustLevelMedium
-	case "high":
-		return TrustLevelHigh
-	case "trusted":
-		return TrustLevelTrusted
-	default:
-		return TrustLevelUnknown
-	}
-}
 
 // DevicePlatform represents the platform type of a device
 type DevicePlatform struct {
@@ -114,25 +61,38 @@ type ScenarioSupport struct {
 
 // DeviceCapabilities represents the capabilities of a device
 type DeviceCapabilities struct {
-	Identity          DeviceIdentity         `json:"identity"`
-	TrustedSupport    *TrustedCodecSupport   `json:"trusted_support,omitempty"`
-	ScenarioSupport   []ScenarioSupport      `json:"scenario_support"`
-	VideoCodecs       []string               `json:"video_codecs"`
-	AudioCodecs       []string               `json:"audio_codecs"`
-	SubtitleFormats   []string               `json:"subtitle_formats"`
-	ContainerFormats  []string               `json:"container_formats"`
-	MaxWidth          int                    `json:"max_width"`
-	MaxHeight         int                    `json:"max_height"`
-	MaxBitrate        int64                  `json:"max_bitrate"`
-	SupportsHDR       bool                   `json:"supports_hdr"`
-	SupportsDV        bool                   `json:"supports_dolby_vision"`
-	SupportsAtmos     bool                   `json:"supports_dolby_atmos"`
-	SupportsDTS       bool                   `json:"supports_dts"`
-	DirectPlaySupport map[string]bool        `json:"direct_play_support"`
-	TranscodePrefs    map[string]interface{} `json:"transcode_preferences"`
-	TrustLevel        TrustLevel             `json:"trust_level"`
-	TrustScore        float64                `json:"trust_score"`
-	LastUpdated       string                 `json:"last_updated"`
+	DeviceID            string                 `json:"device_id,omitempty"`
+	DeviceName          string                 `json:"device_name,omitempty"`
+	Platform            string                 `json:"platform,omitempty"`
+	OSVersion           string                 `json:"os_version,omitempty"`
+	AppVersion          string                 `json:"app_version,omitempty"`
+	Model               string                 `json:"model,omitempty"`
+	Manufacturer        string                 `json:"manufacturer,omitempty"`
+	UserAgent           string                 `json:"user_agent,omitempty"`
+	Identity            DeviceIdentity         `json:"identity"`
+	TrustedSupport      *TrustedCodecSupport   `json:"trusted_support,omitempty"`
+	ScenarioSupport     []ScenarioSupport      `json:"scenario_support"`
+	VideoCodecs         []string               `json:"video_codecs"`
+	AudioCodecs         []string               `json:"audio_codecs"`
+	SubtitleFormats     []string               `json:"subtitle_formats"`
+	ContainerFormats    []string               `json:"container_formats"`
+	MaxWidth            int                    `json:"max_width"`
+	MaxHeight           int                    `json:"max_height"`
+	MaxBitrate          int64                  `json:"max_bitrate"`
+	SupportsHDR         bool                   `json:"supports_hdr"`
+	Supports10Bit       bool                   `json:"supports_10bit,omitempty"`
+	SupportsDolbyVision bool                   `json:"supports_dolby_vision"`
+	SupportsDolbyAtmos  bool                   `json:"supports_dolby_atmos"`
+	SupportsDTS         bool                   `json:"supports_dts"`
+	DRMSupport          *DRMSupported          `json:"drm_support,omitempty"`
+	DirectPlaySupport   *DirectPlaySupport     `json:"direct_play_support,omitempty"`
+	TranscodingPreferences *TranscodingPrefs   `json:"transcoding_preferences,omitempty"`
+	TrustLevel          TrustLevel             `json:"trust_level"`
+	TrustScore          float64                `json:"trust_score"`
+	LastUpdated         string                 `json:"last_updated"`
+	Timestamp           string                 `json:"timestamp,omitempty"`
+	ProbedAt            time.Time              `json:"probed_at,omitempty"`
+	ProbeDurationMS     int                    `json:"probe_duration_ms,omitempty"`
 }
 
 // ProbeReport represents a probe result report
@@ -180,3 +140,16 @@ const (
 	PlatformXbox           = "xbox"
 	PlatformNintendoSwitch = "nintendo_switch"
 )
+
+// FormatResolution returns a formatted resolution string
+func (c *DeviceCapabilities) FormatResolution() string {
+	if c.MaxWidth > 0 && c.MaxHeight > 0 {
+		return fmt.Sprintf("%dx%d", c.MaxWidth, c.MaxHeight)
+	}
+	return "unknown"
+}
+
+// MaxResolution returns the maximum resolution as a string
+func (c *DeviceCapabilities) MaxResolution() string {
+	return c.FormatResolution()
+}

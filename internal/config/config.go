@@ -17,100 +17,103 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Server       ServerConfig       `koanf:"server"`
-	Database     DatabaseConfig     `koanf:"database"`
-	Libraries    []LibraryConfig    `koanf:"libraries"`
-	Transcoding  TranscodingConfig  `koanf:"transcoding"`
-	Probe        ProbeConfig        `koanf:"probe"`
-	Quality      QualityConfig      `koanf:"quality"`
-	Auth         AuthConfig         `koanf:"auth"`
-	Logging      LoggingConfig      `koanf:"logging"`
+	Server       ServerConfig       `yaml:"server"`
+	Database     DatabaseConfig     `yaml:"database"`
+	Libraries    []LibraryConfig    `yaml:"libraries"`
+	Transcoding  TranscodingConfig  `yaml:"transcoding"`
+	Probe        ProbeConfig        `yaml:"probe"`
+	Quality      QualityConfig      `yaml:"quality"`
+	Auth         AuthConfig         `yaml:"auth"`
+	Logging      LoggingConfig      `yaml:"logging"`
 }
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Host            string        `koanf:"host"`
-	Port            int           `koanf:"port"`
-	ReadTimeout     time.Duration `koanf:"read_timeout"`
-	WriteTimeout    time.Duration `koanf:"write_timeout"`
-	IdleTimeout     time.Duration `koanf:"idle_timeout"`
-	ShutdownTimeout time.Duration `koanf:"shutdown_timeout"`
-	TLS             TLSConfig     `koanf:"tls"`
+	Host            string        `yaml:"host"`
+	Port            int           `yaml:"port"`
+	ReadTimeout     time.Duration `yaml:"read_timeout"`
+	WriteTimeout    time.Duration `yaml:"write_timeout"`
+	IdleTimeout     time.Duration `yaml:"idle_timeout"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+	TLS             TLSConfig     `yaml:"tls"`
 }
 
 // TLSConfig holds TLS configuration
 type TLSConfig struct {
-	Enabled  bool   `koanf:"enabled"`
-	CertPath string `koanf:"cert_path"`
-	KeyPath  string `koanf:"key_path"`
+	Enabled  bool   `yaml:"enabled"`
+	CertPath string `yaml:"cert_path"`
+	KeyPath  string `yaml:"key_path"`
 }
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Driver           string        `koanf:"driver"`
-	DSN              string        `koanf:"dsn"`
-	MaxOpenConns     int           `koanf:"max_open_conns"`
-	MaxIdleConns     int           `koanf:"max_idle_conns"`
-	ConnMaxLifetime  time.Duration `koanf:"conn_max_lifetime"`
+	Driver           string        `yaml:"driver"`
+	DSN              string        `yaml:"dsn"`
+	MaxOpenConns     int           `yaml:"max_open_conns"`
+	MaxIdleConns     int           `yaml:"max_idle_conns"`
+	ConnMaxLifetime  time.Duration `yaml:"conn_max_lifetime"`
 }
 
 // LibraryConfig holds media library configuration
 type LibraryConfig struct {
-	Name             string        `koanf:"name"`
-	Path             string        `koanf:"path"`
-	Type             string        `koanf:"type"`
-	RefreshInterval  time.Duration `koanf:"refresh_interval"`
+	Name             string        `yaml:"name"`
+	Path             string        `yaml:"path"`
+	Type             string        `yaml:"type"`
+	RefreshInterval  time.Duration `yaml:"refresh_interval"`
 }
 
 // TranscodingConfig holds transcoding configuration
 type TranscodingConfig struct {
-	Enabled      bool     `koanf:"enabled"`
-	TempDir      string   `koanf:"temp_dir"`
-	MaxConcurrent int      `koanf:"max_concurrent"`
-	MaxBitrate    int64    `koanf:"max_bitrate"`
-	VideoCodecs  []string `koanf:"video_codecs"`
-	AudioCodecs  []string `koanf:"audio_codecs"`
-	Containers   []string `koanf:"containers"`
+	Enabled      bool     `yaml:"enabled"`
+	TempDir      string   `yaml:"temp_dir"`
+	MaxConcurrent int      `yaml:"max_concurrent"`
+	MaxBitrate    int64    `yaml:"max_bitrate"`
+	VideoCodecs  []string `yaml:"video_codecs"`
+	AudioCodecs  []string `yaml:"audio_codecs"`
+	Containers   []string `yaml:"containers"`
 }
 
 // ProbeConfig holds device probing configuration
 type ProbeConfig struct {
-	Enabled       bool          `koanf:"enabled"`
-	Timeout       time.Duration `koanf:"timeout"`
-	MaxRetries    int           `koanf:"max_retries"`
-	ScenarioDelay time.Duration `koanf:"scenario_delay"`
+	Enabled       bool          `yaml:"enabled"`
+	Timeout       time.Duration `yaml:"timeout"`
+	MaxRetries    int           `yaml:"max_retries"`
+	ScenarioDelay time.Duration `yaml:"scenario_delay"`
 }
 
 // QualityProfile represents a quality preset
 type QualityProfile struct {
-	Name       string `koanf:"name"`
-	MaxWidth   int    `koanf:"max_width"`
-	MaxHeight  int    `koanf:"max_height"`
-	MaxBitrate int64  `koanf:"max_bitrate"`
+	Name       string `yaml:"name"`
+	MaxWidth   int    `yaml:"max_width"`
+	MaxHeight  int    `yaml:"max_height"`
+	MaxBitrate int64  `yaml:"max_bitrate"`
 }
 
 // QualityConfig holds quality profile configuration
 type QualityConfig struct {
-	Profiles []QualityProfile `koanf:"profiles"`
+	Profiles []QualityProfile `yaml:"profiles"`
 }
 
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
-	JWTSecret      string        `koanf:"jwt_secret"`
-	JWTExpiry      time.Duration `koanf:"jwt_expiry"`
-	RefreshExpiry  time.Duration `koanf:"refresh_expiry"`
-	APIKeyHeader   string        `koanf:"api_key_header"`
-	RequireAuth    []string      `koanf:"require_auth"`
-	PublicPaths    []string      `koanf:"public_paths"`
+	JWTSecret      string   `yaml:"jwt_secret"`
+	APIKey         string   `yaml:"api_key"`
+	JWTExpiry      time.Duration `yaml:"jwt_expiry"`
+	RefreshExpiry  time.Duration `yaml:"refresh_expiry"`
+	APIKeyHeader   string   `yaml:"api_key_header"`
+	RequireAuth    []string `yaml:"require_auth"`
+	PublicPaths    []string `yaml:"public_paths"`
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	ProductionMode bool     `yaml:"production_mode"`
 }
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Level           string `koanf:"level"`
-	Format          string `koanf:"format"`
-	Output          string `koanf:"output"`
-	IncludeTimestamp bool   `koanf:"include_timestamp"`
-	IncludeCaller   bool   `koanf:"include_caller"`
+	Level           string `yaml:"level"`
+	Format          string `yaml:"format"`
+	Output          string `yaml:"output"`
+	IncludeTimestamp bool   `yaml:"include_timestamp"`
+	IncludeCaller   bool   `yaml:"include_caller"`
 }
 
 // Load loads configuration from a YAML file
@@ -167,6 +170,25 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Logging.Format == "" {
 		c.Logging.Format = "json"
+	}
+	if c.Auth.APIKeyHeader == "" {
+		c.Auth.APIKeyHeader = "X-API-Key"
+	}
+	if c.Auth.JWTExpiry == 0 {
+		c.Auth.JWTExpiry = time.Hour * 24
+	}
+	if c.Auth.RefreshExpiry == 0 {
+		c.Auth.RefreshExpiry = time.Hour * 24 * 7
+	}
+	// Set CORS defaults based on production mode
+	if len(c.Auth.AllowedOrigins) == 0 {
+		if c.Auth.ProductionMode {
+			// Production: require explicit origins, default to empty (strict)
+			c.Auth.AllowedOrigins = []string{}
+		} else {
+			// Development: allow localhost
+			c.Auth.AllowedOrigins = []string{"http://localhost:*", "http://127.0.0.1:*"}
+		}
 	}
 }
 
