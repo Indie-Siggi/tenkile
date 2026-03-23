@@ -9,6 +9,159 @@
 
 ---
 
+## Agent Rules (READ FIRST)
+
+These rules are mandatory for every agent. They exist because Phase 1 code generation produced code that did not compile. Every rule below addresses a specific failure mode.
+
+### Rule 1: Only import packages that exist
+
+Before importing any internal package (`internal/...` or `pkg/...`), verify it exists in this repository. **Never invent packages.** If your prompt says to use a package that doesn't exist, implement inline or skip — do not create phantom imports. Check the Phase Inventory section below for what's available.
+
+### Rule 2: No duplicate type declarations
+
+Each type has ONE owning file. Before declaring a struct, interface, or type alias, grep the codebase to confirm it doesn't already exist. If it does, import it. The Phase Inventory lists type ownership.
+
+### Rule 3: Use exact library APIs — verify before using
+
+Do NOT guess at function signatures or struct fields. Specific requirements:
+
+| Need | Correct | Wrong (do NOT use) |
+|------|---------|-------------------|
+| SQLite driver | `modernc.org/sqlite`, driver name `"sqlite"` | `mattn/go-sqlite3`, driver name `"sqlite3"` (requires CGo) |
+| Config struct tags | `yaml:"field_name"` | `koanf:"field_name"` (ignored by `yaml.Unmarshal`) |
+| Chi route registration | `r.Get(pattern, handler)`, `r.Post(...)`, `r.MethodFunc(method, pattern, handler)` | `r.HandleFunc(pattern, method, handler)` (3-arg form doesn't exist in chi) |
+| Structured logging | `slog.HandlerOptions{Level: ..., ReplaceAttr: ...}` | `slog.HandlerOptions{TimeFunc: ...}` (field doesn't exist) |
+| Config library | `gopkg.in/yaml.v3` with `yaml.Unmarshal` | `koanf` (not used in this project) |
+
+### Rule 4: Go compilation is non-negotiable
+
+Go treats unused variables, unused imports, and type mismatches as **hard errors** — the program will not compile. Before considering your work done:
+- Remove every unused variable (or use `_` if the call has side effects)
+- Remove every unused import
+- Verify every struct field you reference actually exists on that struct
+- Verify every method you call actually exists on that type with the correct signature
+- Run `go build ./...` and fix all errors
+
+### Rule 5: Tests must match implementation
+
+Write tests AFTER the implementation, not before. Tests must assert the behavior the code actually has. If the validator adds a warning (not an error) for unknown platforms, the test must check for a warning, not assert `IsValid == false`.
+
+### Rule 6: Complete every function
+
+Do not leave functions truncated or half-written. If a file is getting long (>500 lines), split into multiple files within the same package. Every `{` must have a matching `}`. Every `func` must have a complete body.
+
+### Rule 7: Cross-reference types when writing multi-file code
+
+When your code references a type from another file (even in the same package):
+- Read that file first to confirm the exact field names, types, and method signatures
+- Use the exact names — `SupportsDolbyVision` not `SupportsDV`, `UpdateDevice()` not `Update()`, `RemoveDevice()` not `Delete()`
+- If you need a field that doesn't exist, add it to the owning file, don't create a duplicate struct
+
+### Rule 8: Validate after each agent's work
+
+Every agent prompt should end with a compilation check. Run `go build ./...` and `go test ./...` before considering the task complete. Fix any errors before moving on.
+
+### Rule 9: Method signatures are contracts
+
+When calling methods on types from other files/packages, use the exact signature. Key signatures in this codebase:
+- `cache.Get(deviceID string) (*DeviceCapabilities, bool)` — returns `(value, found)`, NOT `(value, error)`
+- `cache.Set(deviceID string, caps *DeviceCapabilities, source string) error`
+- `NewCapabilityCache(config *CacheConfig) (*CapabilityCache, error)` — nil config = memory-only defaults
+- `NewCuratedDatabase() *CuratedDatabase` — no arguments
+- `NewValidator() *Validator` — no arguments
+
+---
+
+## Phase 1 Inventory (completed)
+
+Phase 1 is done. The following packages, types, and functions exist. Phase 2+ agents MUST use these — do not redefine them.
+
+### Package: `pkg/codec`
+- `database.go` — Codec/container/format constants and `Equal(a, b string) bool`
+- `mime.go` — MIME type mappings
+
+### Package: `internal/probes`
+
+**Type ownership (one file owns each type, do not redeclare):**
+
+| File | Types owned |
+|------|------------|
+| `types.go` | `DevicePlatform`, `DeviceIdentity`, `TrustedCodecSupport`, `ScenarioSupport`, `DeviceCapabilities`, `ProbeReport`, `ScenarioResult`, platform constants, codec/container lists |
+| `trust.go` | `TrustLevel` (7 levels: Untrusted→Verified), `TrustScore`, `TrustResolver`, `SourceClaim`, `ResolvedCapability` |
+| `validator.go` | `ValidationResult`, `ValidationError`, `ValidationWarning`, `AnomalyRecord`, `Validator`, `PlatformConstraints` |
+| `parser.go` | `CodecProbeResult`, `VideoCodecInfo`, `AudioCodecInfo`, `DirectPlaySupport`, `TranscodingPrefs` |
+| `cache.go` | `CapabilityCache`, `CachedCapability`, `CacheStats`, `CacheConfig` |
+| `curated.go` | `CuratedDevice`, `KnownIssue`, `CuratedDatabase`, `DatabaseStats`, `SearchCriteria` |
+| `drm.go` | `DRMSupported`, `DRMSystemDetail` |
+
+**Key function signatures:**
+
+```go
+// Cache
+func NewCapabilityCache(config *CacheConfig) (*CapabilityCache, error)
+func (c *CapabilityCache) Get(deviceID string) (*DeviceCapabilities, bool)
+func (c *CapabilityCache) Set(deviceID string, caps *DeviceCapabilities, source string) error
+func (c *CapabilityCache) Delete(deviceID string)
+func (c *CapabilityCache) Clear()
+func (c *CapabilityCache) BatchGet(deviceIDs []string) (map[string]*DeviceCapabilities, error)
+func (c *CapabilityCache) BatchSet(entries map[string]*DeviceCapabilities, source string) error
+func (c *CapabilityCache) GetStats() CacheStats
+func (c *CapabilityCache) Close() error
+
+// Curated DB
+func NewCuratedDatabase() *CuratedDatabase
+func (cd *CuratedDatabase) GetByID(id string) (*CuratedDevice, bool)
+func (cd *CuratedDatabase) GetByDeviceHash(deviceHash string) (*CuratedDevice, bool)
+func (cd *CuratedDatabase) GetByPlatform(platform string) []*CuratedDevice
+func (cd *CuratedDatabase) Search(criteria SearchCriteria) []*CuratedDevice
+func (cd *CuratedDatabase) AddDevice(device *CuratedDevice) error
+func (cd *CuratedDatabase) UpdateDevice(device *CuratedDevice) error
+func (cd *CuratedDatabase) RemoveDevice(deviceID string) error
+func (cd *CuratedDatabase) GetStats() DatabaseStats
+func (cd *CuratedDatabase) GetAll() []*CuratedDevice
+
+// Validator
+func NewValidator() *Validator
+func (v *Validator) ValidateCapabilities(caps *DeviceCapabilities) *ValidationResult
+
+// Trust
+func NewTrustResolver() *TrustResolver
+func (tr *TrustResolver) Resolve(claims []SourceClaim) *ResolvedCapability
+
+// Parser
+func ParseCodecProbe(probeJSON []byte) (*DeviceCapabilities, error)
+func ParseCodecProbeResult(probe *CodecProbeResult) (*DeviceCapabilities, error)
+```
+
+### Package: `internal/api`
+- `router.go` — Chi router with middleware, `NewRouter(cfg, db) http.Handler`
+- `devices.go` — `DeviceHandlers` with probe report, capability lookup, validation, search
+- `playback.go` — `PlaybackHandlers` with decision, feedback, transcode, profiles, validate
+- `admin.go` — `AdminHandlers` with system info, stats, cache cleanup, curated device management
+- `response.go` — `RespondJSON(w, status, v)` and `ErrorResponse{Error, Message}`
+
+### Package: `internal/config`
+- `config.go` — `Config` struct with `yaml:"..."` tags, `Load(path) (*Config, error)`
+
+### Package: `internal/database`
+- `sqlite.go` — `SQLite` struct, `NewSQLite(path) (*SQLite, error)`, `DB() *sql.DB`
+
+### Package: `cmd/tenkile`
+- `main.go` — Entry point, CLI flags, slog setup, HTTP server start
+
+### Module dependencies (in go.mod)
+```
+github.com/go-chi/chi/v5
+github.com/go-chi/cors
+modernc.org/sqlite
+golang.org/x/crypto
+gopkg.in/yaml.v3
+```
+
+Not in go.mod yet (add when needed): `github.com/jackc/pgx/v5`, `github.com/pressly/goose/v3`, `github.com/gorilla/websocket`, `github.com/golang-jwt/jwt/v5`, `github.com/stretchr/testify`
+
+---
+
 ## License
 
 Tenkile is licensed under **AGPL-3.0-or-later** (GNU Affero General Public License v3).
@@ -205,7 +358,7 @@ Go module dependencies (go get these after go mod init):
   - github.com/gorilla/websocket       # WebSocket support
 
   Config:
-  - github.com/knadh/koanf/v2          # YAML/env config loading
+  - gopkg.in/yaml.v3                    # YAML config loading (use yaml struct tags)
 
   Auth:
   - github.com/golang-jwt/jwt/v5       # JWT tokens
@@ -453,7 +606,7 @@ Will be embedded in the Go binary using the embed directive.
 After completing all Phase 1 tasks (1.1–1.4), create a git commit:
 
 ```bash
-git add -A
+git add -A && git diff --cached --stat  # Review what's staged before committing
 git commit -m "Phase 1: Foundation — probe & cache
 
 Scaffold Go project, define codec types, implement probe receiver/validator/cache,
@@ -507,9 +660,16 @@ Create in internal/server/:
 Use exec.Command for FFmpeg/nvidia-smi/vainfo interaction.
 Parse stdout/stderr for capability detection.
 
+IMPORTANT: This package is NEW (internal/server/). Do NOT import internal/probes/
+types or internal/transcode/ types — the server inventory is independent.
+The only shared dependency is pkg/codec/ for codec name constants.
+
 Write tests with mock command outputs (mock the exec.Command calls).
 Test: NVIDIA system, Intel QSV system, VAAPI Linux system, macOS VideoToolbox,
 software-only system, Raspberry Pi (V4L2).
+
+After completing 2.1, run: go build ./... && go test ./internal/server/...
+Fix all errors before proceeding to 2.2.
 ```
 
 ### Agent Prompt 2.2: Implement Quality-Preserving Transcode Decision Engine
@@ -550,6 +710,13 @@ Source context:
 - internal/probes/ (from Phase 1 - device capabilities with trust scores)
 - internal/server/ (from 2.1 - server encoding inventory)
 - ../docs/ARCHITECTURE.md (TranscodeOrchestrator, QualityPreservationPolicy, codec ladders)
+
+IMPORTANT — Read before writing:
+- Read internal/probes/types.go for DeviceCapabilities fields (see Phase 1 Inventory)
+- Read internal/server/inventory.go for ServerCapabilities from 2.1
+- Use exact field names from those structs — do NOT guess
+- The transcode package should import internal/probes and internal/server, plus pkg/codec
+- Do NOT create any types that duplicate what's in internal/probes/types.go
 
 Create in internal/transcode/:
 
@@ -624,6 +791,9 @@ Quality handling matrix (the most important tests):
   | AV1 4K HDR  | HEVC (HDR device) | hevc_nvenc (HDR OK) | HEVC HDR10 HW passthrough   |
 
 Use table-driven tests (Go convention).
+
+After completing 2.2, run: go build ./... && go test ./internal/transcode/...
+Fix all errors before proceeding to 2.3.
 ```
 
 ### Agent Prompt 2.3: Implement Decision Logger
@@ -654,9 +824,18 @@ Create in internal/transcode/:
    - PlaybackSucceeded (updated later), FailureReason
 
 3. Admin query endpoints in internal/api/admin.go:
+   IMPORTANT: admin.go ALREADY EXISTS from Phase 1. Add new handler methods
+   to the existing AdminHandlers struct — do NOT create a new struct or file.
+   Use the existing RespondJSON() helper from response.go.
+
    GET /api/v1/admin/decisions?deviceId=X&from=date&to=date
    GET /api/v1/admin/decisions/stats (aggregate: direct play %, transcode %,
        HDR preservation %, avg trust, failure rate)
+
+   Register new routes in router.go inside the existing admin Route group.
+
+After completing 2.3, run: go build ./... && go test ./...
+Fix all errors before committing.
 ```
 
 ### Phase 2 Checkpoint: Git Commit
@@ -664,7 +843,7 @@ Create in internal/transcode/:
 After completing all Phase 2 tasks (2.1–2.3), create a git commit:
 
 ```bash
-git add -A
+git add -A && git diff --cached --stat  # Review what's staged before committing
 git commit -m "Phase 2: Server inventory + decision engine
 
 Implement server capability discovery, quality-preserving transcode decision
@@ -685,14 +864,22 @@ Smart TVs (Samsung Tizen, LG WebOS, Roku) have FIXED capabilities per model/firm
 Their web engines often have broken or incomplete API implementations, making JS probing
 unreliable. A curated database is more trustworthy (trust=0.90) than runtime probing.
 
-Create in internal/probes/:
+IMPORTANT: internal/probes/curated.go ALREADY EXISTS from Phase 1 with:
+- CuratedDevice struct, CuratedDatabase struct, KnownIssue struct
+- NewCuratedDatabase(), Load(), AddDevice(), UpdateDevice(), RemoveDevice()
+- GetByID(), GetByDeviceHash(), GetByPlatform(), Search(), GetAll()
+- Vote(), MarkVerified(), GetRecommendedProfile()
+- See Phase 1 Inventory for full method signatures.
 
-1. curated.go
-   - Load from JSON files at startup (embedded via Go embed directive)
-   - Match device model from User-Agent string or device registration headers
-   - Return full DeviceCapabilities for known models
-   - Fuzzy matching: "Samsung UN55TU8000" matches "UN*TU8*" pattern
-   - Version-aware: different firmware versions may have different codec support
+Extend the existing code — do NOT rewrite or redeclare these types.
+
+Tasks for Phase 3.1:
+
+1. Extend curated.go:
+   - Add LoadFromEmbedded(data []byte) for Go embed loading
+   - Add fuzzy matching: "Samsung UN55TU8000" matches "UN*TU8*" pattern
+   - Add version-aware matching: different firmware = different codec support
+   - Add export/import format for community sharing
 
 2. data/curated/ - JSON seed data:
    - samsung_tizen.json (2018-2025 model families, codec support per SoC)
@@ -700,14 +887,17 @@ Create in internal/probes/:
    - roku.json (per-model codec matrix)
    - android_tv.json (Chromecast, Shield, Mi Box, etc.)
 
-3. Admin API in internal/api/admin.go:
-   GET  /api/v1/admin/curated-devices
-   POST /api/v1/admin/curated-devices (add new entry)
-   PUT  /api/v1/admin/curated-devices/{id} (update)
+3. Admin API in internal/api/admin.go (ALREADY EXISTS — extend):
+   admin.go already has AdminHandlers with curated device management stubs.
+   router.go already registers routes at /api/v1/admin/curated-devices.
+   Add PUT handler for updates. Use existing RespondJSON() and ErrorResponse.
 
 4. Community contribution workflow:
    - Export/import format for sharing device profiles
    - Merge with conflict resolution
+
+After completing 3.1, run: go build ./... && go test ./internal/probes/...
+Fix all errors before proceeding to 3.2.
 ```
 
 ### Agent Prompt 3.2: Implement Playback Feedback Loop
@@ -720,11 +910,13 @@ trust scores for all capability claims involved in that decision.
 
 Create in internal/probes/:
 
-1. feedback.go
+1. feedback.go (NEW file in existing internal/probes/ package)
+   - Use existing types from types.go (DeviceCapabilities, etc.) — do NOT redeclare
+   - Use existing TrustLevel constants from trust.go
    - RecordResult(ctx, PlaybackFeedback) error
    - On success: boost trust to 0.95
    - On failure: reduce trust to 0.05, flag device for re-probe
-   - Cross-reference with the original PlaybackDecisionLog
+   - Cross-reference with the original PlaybackDecisionLog from internal/transcode/
 
 2. FeedbackEntry model:
    - DeviceID, MediaItemID, VideoCodec, AudioCodec, Container
@@ -742,6 +934,9 @@ Create in internal/probes/:
    - After playback failure: mark device for re-probe on next connection
    - If 3+ failures for same codec: reduce trust to 0 and stop recommending
    - If curated DB says supported but feedback says failed: log discrepancy
+
+After completing 3.2, run: go build ./... && go test ./...
+Fix all errors before committing.
 ```
 
 ### Phase 3 Checkpoint: Git Commit
@@ -749,7 +944,7 @@ Create in internal/probes/:
 After completing all Phase 3 tasks (3.1–3.2), create a git commit:
 
 ```bash
-git add -A
+git add -A && git diff --cached --stat  # Review what's staged before committing
 git commit -m "Phase 3: Curated device DB + playback feedback loop
 
 Build curated Smart TV database and implement playback feedback loop for
@@ -800,6 +995,12 @@ Create in internal/media/:
    - Container, Duration, Bitrate
    - IsInterlaced, HasAnamorphicPixels, PixelAspectRatio
    - MasteringDisplayMetadata, MaxContentLightLevel, DolbyVisionProfile
+
+This is a NEW package (internal/media/). Use pkg/codec for codec name constants.
+Do NOT import internal/probes/ or internal/transcode/ — the media scanner is
+independent. The transcode engine will import media types, not the other way around.
+
+After completing 4.1, run: go build ./... && go test ./internal/media/...
 ```
 
 ### Agent Prompt 4.2: Implement HLS/DASH Streaming
@@ -830,6 +1031,15 @@ Create in internal/api/:
 4. Bandwidth estimation:
    - Estimate connection speed from segment download times
    - Adjust quality if bandwidth is insufficient for current stream
+
+Create stream.go as a NEW file in internal/api/. The existing router.go already
+has stub handlers (listLibrariesHandler, etc.) — replace those stubs with real
+implementations that call the new media and streaming packages.
+
+Register new routes in router.go inside the existing auth Route group.
+Use existing RespondJSON() and ErrorResponse from response.go.
+
+After completing 4.2, run: go build ./... && go test ./...
 ```
 
 ### Agent Prompt 4.3: Create OpenAPI Specification
@@ -901,6 +1111,14 @@ After creating the spec, generate code:
   - Run: make generate
 
 The generated Go interface becomes the contract — handlers must implement it.
+
+NOTE: Many of these endpoints already exist in router.go from Phase 1.
+The OpenAPI spec should document the ACTUAL routes and request/response shapes
+already implemented, plus new ones from Phases 2-4. Do not change existing
+handler signatures to match a spec — update the spec to match the code,
+then evolve both together.
+
+After generating code, run: go build ./... && go test ./...
 ```
 
 ### Agent Prompt 4.4: Implement Auth and First-Run Setup
@@ -912,12 +1130,14 @@ Prerequisites: api/openapi.yaml (4.3)
 
 Create:
 
-1. internal/api/middleware.go
-   - JWT authentication middleware (validate access token from Authorization header)
+1. internal/api/middleware.go (NEW file, but NOTE: router.go already has)
+   - authMiddleware (stub) and adminOnlyMiddleware (stub) — replace stubs with real JWT validation
+   - rateLimitMiddleware with rateLimiter struct — already implemented, extend if needed
+   - CORS is already configured in router.go via chi/cors — do NOT duplicate
+   - Request logging already uses chi/middleware.Logger — do NOT duplicate
+   Add to middleware.go:
+   - JWT token validation logic
    - API key authentication (for third-party clients, X-API-Key header)
-   - CORS middleware (configurable allowed origins)
-   - Rate limiting middleware (configurable per-endpoint)
-   - Request logging middleware (slog)
 
 2. internal/api/auth.go (implement generated server interfaces)
    - POST /api/v1/auth/login
@@ -950,6 +1170,10 @@ Tests:
   - API key auth
   - First-run setup: works when no users, blocked when users exist
   - CORS: allowed and disallowed origins
+
+Register auth routes in router.go — add a new public group for /auth endpoints.
+Use existing RespondJSON() and ErrorResponse from response.go.
+After completing 4.4, run: go build ./... && go test ./...
 ```
 
 ### Agent Prompt 4.5: Build Web Client
@@ -1014,11 +1238,12 @@ Create web/ directory:
    └── library.ts             # Current library view, filters, search query
 
 7. Embed in Go binary:
-   In cmd/tenkile/main.go, add:
-     //go:embed web/dist/*
+   cmd/tenkile/main.go ALREADY EXISTS — extend it, do NOT rewrite.
+   Add: //go:embed web/dist/*
    Serve at /web/* with SPA fallback (index.html for unmatched routes).
    Root (/) redirects to /web/.
    --no-web flag disables web client serving (API-only mode).
+   The existing main.go uses slog, flag, and starts an http.Server — follow the same patterns.
 
 Technology constraints:
   - Preact (not React) — 3KB vs 40KB
@@ -1033,6 +1258,11 @@ Build:
   cd web && npm run build -> outputs to web/dist/
   make build-web runs this step
   make dev runs Vite dev server with proxy to Go server on port 8096
+
+NOTE: web/probe/tenkile-probe.js ALREADY EXISTS from Phase 1.
+Import it from the probe integration code, do not recreate it.
+
+After completing 4.5, run: cd web && npm run build && cd .. && go build ./...
 ```
 
 ### Agent Prompt 4.6: Implement WebSocket Real-Time Events
@@ -1089,6 +1319,11 @@ Create:
    - Show scan progress bar on home page
    - Show transcode progress in player
    - Show active sessions in admin/settings page
+
+Register the WebSocket endpoint in router.go inside the existing auth group.
+Use github.com/gorilla/websocket — add to go.mod with go get.
+
+After completing 4.6, run: go build ./... && go test ./...
 ```
 
 ### Agent Prompt 4.7: Docker and Deployment
@@ -1192,10 +1427,10 @@ Create:
      level: info                   # debug | info | warn | error
      format: text                  # text | json
 
-4. internal/config/config.go
-   - Parse YAML config with github.com/knadh/koanf/v2
-   - Environment variable overrides: TENKILE_SERVER_PORT=9090, TENKILE_DATABASE_DRIVER=postgres, etc.
-   - Validate on startup (check paths exist, FFmpeg available, etc.)
+4. internal/config/config.go (ALREADY EXISTS from Phase 1 — extend, don't rewrite)
+   - Uses gopkg.in/yaml.v3 with yaml struct tags (NOT koanf)
+   - Add environment variable overrides: TENKILE_SERVER_PORT=9090, TENKILE_DATABASE_DRIVER=postgres, etc.
+   - Add validation on startup (check paths exist, FFmpeg available, etc.)
    - Auto-generate JWT secret on first run, persist to config file
 
 5. .dockerignore:
@@ -1211,6 +1446,8 @@ Tests:
   - Config loading: YAML file, env overrides, defaults
   - Config validation: missing library paths, invalid driver, bad port
   - Docker build: verify image builds and binary starts (CI integration test)
+
+After completing 4.7, run: go build ./... && go test ./... && docker build -t tenkile:latest .
 ```
 
 ### Phase 4 Checkpoint: Git Commit
@@ -1218,7 +1455,7 @@ Tests:
 After completing all Phase 4 tasks (4.1–4.7), create a git commit:
 
 ```bash
-git add -A
+git add -A && git diff --cached --stat  # Review what's staged before committing
 git commit -m "Phase 4: Media library, streaming, web UI & deployment
 
 Implement media scanner, HLS streaming, OpenAPI spec, auth/first-run setup,
@@ -1247,12 +1484,14 @@ Create in internal/clients/:
 
 1. adapter.go - ClientAdapter interface
    - ClientType() string
-   - ExtractCapabilities(r *http.Request) (*DeviceCapabilities, error)
-   - ParsePlaybackRequest(r *http.Request) (*PlaybackRequest, error)
+   - ExtractCapabilities(r *http.Request) (*probes.DeviceCapabilities, error)
+   - Import DeviceCapabilities from internal/probes — do NOT redeclare it
+   - The DeviceCapabilities struct has Platform, UserAgent, VideoCodecs, AudioCodecs,
+     MaxWidth, MaxHeight, SupportsHDR, SupportsDolbyVision, etc. (see Phase 1 Inventory)
 
 2. detect.go - Identify platform from request headers/UA, route to adapter
 
-3. web.go - Web client adapter (uses CodecProbe results)
+3. web.go - Web client adapter (uses CodecProbe results from Phase 1 probe library)
 
 4. Android/ - Kotlin probe library (future, create interface + stubs)
    - Query MediaCodecList.getCodecInfos() for all HW decoders
@@ -1266,6 +1505,8 @@ Create in internal/clients/:
 
 For now: implement the adapter interface and WebClientAdapter.
 Native probe stubs document what each platform API provides.
+
+After completing 5.1, run: go build ./... && go test ./internal/clients/...
 ```
 
 ### Phase 5 Checkpoint: Git Commit
@@ -1273,7 +1514,7 @@ Native probe stubs document what each platform API provides.
 After completing all Phase 5 tasks (5.1), create a git commit:
 
 ```bash
-git add -A
+git add -A && git diff --cached --stat  # Review what's staged before committing
 git commit -m "Phase 5: Client adapters + native probe stubs
 
 Implement client adapter interface, web adapter, and platform-specific
