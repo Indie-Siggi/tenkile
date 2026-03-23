@@ -126,26 +126,13 @@ func (fi *FeedbackIntegration) handleReProbeRequired(deviceID string, reason str
 	}
 }
 
-// triggerReProbe triggers a re-probe for a device
+// triggerReProbe triggers a re-probe for a device after the configured delay
 func (fi *FeedbackIntegration) triggerReProbe(deviceID string, caps *DeviceCapabilities, reason string) {
-	// Create a cancellable context for the delay
-	ctx, cancel := context.WithTimeout(context.Background(), fi.config.ReProbeDelay)
-	defer cancel()
+	// Wait for the configured delay before re-probing
+	timer := time.NewTimer(fi.config.ReProbeDelay)
+	defer timer.Stop()
 
-	// Wait for the configured delay or cancellation
-	select {
-	case <-ctx.Done():
-		// Delay completed or context cancelled
-		if ctx.Err() == context.Canceled {
-			// Another feedback received, cancel re-probe
-			slog.Debug("Re-probe cancelled due to new feedback",
-				"device_id", deviceID)
-			return
-		}
-		// Proceed with re-probe (timeout reached)
-	default:
-		// Continue to re-probe logic
-	}
+	<-timer.C
 
 	slog.Info("Triggering re-probe for device",
 		"device_id", deviceID,

@@ -217,8 +217,8 @@ func (fm *FeedbackManager) recordFeedback(feedback PlaybackFeedback) {
 		}
 	}
 
-	// Calculate trust delta
-	trustDelta := fm.CalculateTrustDelta(feedback.Outcome)
+	// Calculate trust delta (use non-locking version since we already hold the lock)
+	trustDelta := calculateTrustDeltaFromConfig(fm.trustConfig, feedback.Outcome)
 
 	// Create event
 	event := PlaybackEvent{
@@ -238,11 +238,17 @@ func (fm *FeedbackManager) recordFeedback(feedback PlaybackFeedback) {
 	}
 	fm.events[feedback.DeviceID] = events
 
-	// Update statistics
+	// Capture old trust delta before updating stats
+	stats := fm.stats[feedback.DeviceID]
+	oldTrustDelta := float64(0)
+	if stats != nil {
+		oldTrustDelta = stats.CurrentTrustDelta
+	}
+
+	// Update statistics (this applies trustDelta to stats.CurrentTrustDelta)
 	fm.updateStats(feedback, trustDelta)
 
 	// Check if re-probe is needed (must be done while mutex is held)
-	stats := fm.stats[feedback.DeviceID]
 	needsReProbe := false
 	reProbeReason := ""
 	if stats != nil {
@@ -254,22 +260,19 @@ func (fm *FeedbackManager) recordFeedback(feedback PlaybackFeedback) {
 		}
 	}
 
-	// Capture values before unlocking to avoid race conditions in goroutines
-	capturedReProbe := needsReProbe
-	capturedReProbeReason := reProbeReason
-	capturedTrustDelta := stats.CurrentTrustDelta + trustDelta
-	stats.CurrentTrustDelta = capturedTrustDelta
+	// Capture values before goroutines to avoid race conditions
+	capturedDeviceID := feedback.DeviceID
+	capturedOldDelta := oldTrustDelta
+	capturedNewDelta := stats.CurrentTrustDelta
 
-	// Check if re-probe is needed
-	if capturedReProbe {
-		if fm.onReProbeRequired != nil {
-			go fm.onReProbeRequired(feedback.DeviceID, capturedReProbeReason)
-		}
+	// Notify re-probe callback
+	if needsReProbe && fm.onReProbeRequired != nil {
+		go fm.onReProbeRequired(capturedDeviceID, reProbeReason)
 	}
 
 	// Notify trust change callback
 	if fm.onTrustChange != nil {
-		go fm.onTrustChange(feedback.DeviceID, stats.CurrentTrustDelta, capturedTrustDelta)
+		go fm.onTrustChange(capturedDeviceID, capturedOldDelta, capturedNewDelta)
 	}
 
 	slog.Debug("Recorded playback feedback",
@@ -284,29 +287,31 @@ func (fm *FeedbackManager) CalculateTrustDelta(outcome PlaybackOutcome) float64 
 	config := fm.trustConfig
 	fm.mu.RUnlock()
 
-	var delta float64
+	return calculateTrustDeltaFromConfig(config, outcome)
+}
+
+// calculateTrustDeltaFromConfig computes trust delta without locking (caller must hold lock or pass a copy)
+func calculateTrustDeltaFromConfig(config TrustAdjustmentConfig, outcome PlaybackOutcome) float64 {
 	switch outcome {
 	case OutcomeSuccess:
-		delta = config.SuccessBonus
+		return config.SuccessBonus
 	case OutcomeNetworkError:
-		delta = -config.NetworkErrorPenalty
+		return -config.NetworkErrorPenalty
 	case OutcomeCodecError:
-		delta = -config.CodecErrorPenalty
+		return -config.CodecErrorPenalty
 	case OutcomeDecodingFailed:
-		delta = -config.DecodingFailedPenalty
+		return -config.DecodingFailedPenalty
 	case OutcomeRendererCrash:
-		delta = -config.RendererCrashPenalty
+		return -config.RendererCrashPenalty
 	case OutcomeUnsupportedFormat:
-		delta = -config.CodecErrorPenalty // Treat as codec error
+		return -config.CodecErrorPenalty // Treat as codec error
 	case OutcomeTimeout:
-		delta = -config.NetworkErrorPenalty
+		return -config.NetworkErrorPenalty
 	case OutcomeBuffering:
-		delta = -config.NetworkErrorPenalty * 0.5 // Less severe
+		return -config.NetworkErrorPenalty * 0.5 // Less severe
 	default:
-		delta = 0
+		return 0
 	}
-
-	return delta
 }
 
 // updateStats updates playback statistics for a device

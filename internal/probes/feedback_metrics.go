@@ -321,52 +321,7 @@ func formatValue(v interface{}) string {
 
 // formatFloat formats a float for Prometheus
 func formatFloat(f float64) string {
-	return string(formatFloatToString(f))
-}
-
-// formatFloatToString converts float to string with appropriate precision
-func formatFloatToString(f float64) []byte {
-	var result [32]byte
-	pos := len(result)
-
-	// Handle negative
-	if f < 0 {
-		result[pos-1] = '-'
-		pos--
-		f = -f
-	}
-
-	// Handle special cases
-	if f == 0 {
-		return append(result[:pos], '0')
-	}
-
-	// Handle large numbers
-	if f >= 1e10 {
-		// Scientific notation
-		exp := 0
-		for f >= 10 {
-			f /= 10
-			exp++
-		}
-		return append(result[:pos], []byte(fmt.Sprintf("%d.%09dE+%d", int(f), int(f*1e9)%1e9, exp))...)
-	}
-
-	// Handle small numbers
-	if f < 1e-6 {
-		exp := 0
-		for f < 1 {
-			f *= 10
-			exp--
-		}
-		return append(result[:pos], []byte(fmt.Sprintf("%d.%09dE%d", int(f), int(f*1e9)%1e9, exp))...)
-	}
-
-	// Regular floating point
-	// Use 9 decimal places for sufficient precision
-	intPart := int(f)
-	fracPart := int((f - float64(intPart)) * 1e9)
-	return append(result[:pos], []byte(fmt.Sprintf("%d.%09d", intPart, fracPart))...)
+	return fmt.Sprintf("%g", f)
 }
 
 // formatInt formats an int64 for Prometheus
