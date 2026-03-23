@@ -4,6 +4,7 @@
 > **Language:** Go
 > **Source repos:** `../jellyfin/` (C#/.NET reference), `../codecprobe/` (JavaScript codec detection)
 > **Architecture:** `../docs/ARCHITECTURE.md`
+> **Reference docs:** `../docs/` (codec, container, DRM, device detection, FFmpeg, Jellyfin references)
 > **Target:** This folder (`Tenkile/`)
 > **License:** AGPL-3.0-or-later
 
@@ -337,6 +338,7 @@ Study these files to understand the problems Tenkile solves:
 - **Encoding pipeline:** `../jellyfin/MediaBrowser.MediaEncoding/Encoder/MediaEncoder.cs` - FFmpeg wrapper with hardware detection. Study for FFmpeg interaction patterns.
 - **HLS controller:** `../jellyfin/Jellyfin.Api/Controllers/DynamicHlsController.cs` - streaming endpoint. Study for HLS serving patterns.
 - **Device profiles:** `../jellyfin/MediaBrowser.Model/Dlna/DeviceProfile.cs`, `DirectPlayProfile.cs` - static profile-based matching. Study to understand what we're replacing.
+- **Summary reference:** `../docs/JELLYFIN_REFERENCE.md` - key Jellyfin files studied, what it gets right/wrong, design lessons for Tenkile
 
 ### CodecProbe (JavaScript - active project)
 
@@ -601,6 +603,11 @@ Source files to analyze:
 - ../codecprobe/js/drm-detection.js      (DRM_SYSTEMS, testKeySystem result shape)
 - ../codecprobe/js/device-detection.js   (device info fields)
 
+Reference docs (research material — profiles, levels, MIME types, format details):
+- ../docs/CODEC_REFERENCE.md             (video/audio codec profiles, levels, codec strings)
+- ../docs/CONTAINER_FORMATS.md           (container formats, MIME types, streaming protocols)
+- ../docs/DRM_REFERENCE.md               (DRM systems, security levels, key system identifiers)
+
 Create in pkg/codec/:
 
 1. database.go - Codec/container/scenario definitions
@@ -653,6 +660,7 @@ Source context:
 - CodecProbe's testScenarioCapabilities (line 158): per-scenario mediaCapabilities.decodingInfo
   with supported/smooth/powerEfficient and 800ms timeout
 - Architecture spec: ../docs/ARCHITECTURE.md (ProbeResultValidator, TrustResolver)
+- ../docs/DEVICE_DETECTION.md (browser capability APIs, trust scoring, validation rules for lying APIs)
 
 Create:
 
@@ -718,6 +726,10 @@ Source context:
 - ../codecprobe/js/device-detection.js (detectDeviceInfo)
 - ../codecprobe/js/codec-database-v2.js (codec definitions)
 
+Reference docs:
+- ../docs/DEVICE_DETECTION.md (browser APIs, Smart TV detection, consensus logic)
+- ../docs/DRM_REFERENCE.md   (DRM systems, EME stack, security levels)
+
 Create in web/probe/:
 
 1. tenkile-probe.js - Standalone probe library (zero UI dependencies)
@@ -774,6 +786,7 @@ Source context (reference only - study patterns, don't import):
 - ../jellyfin/MediaBrowser.MediaEncoding/Encoder/MediaEncoder.cs
   (FFmpeg wrapper, has VAAPI detection, Vulkan DRM interop checks)
 - ../docs/ARCHITECTURE.md (ServerCapabilities, HardwareAcceleration, EncoderCapability)
+- ../docs/FFMPEG_REFERENCE.md (FFmpeg discovery commands, HW accel probing, encoder names)
 
 Create in internal/server/:
 
@@ -858,6 +871,9 @@ Source context:
 - internal/probes/ (from Phase 1 - device capabilities with trust scores)
 - internal/server/ (from 2.1 - server encoding inventory)
 - ../docs/ARCHITECTURE.md (TranscodeOrchestrator, QualityPreservationPolicy, codec ladders)
+- ../docs/CODEC_REFERENCE.md (codec profiles, levels, HDR metadata formats)
+- ../docs/CONTAINER_FORMATS.md (container compatibility, remux vs transcode decisions)
+- ../docs/FFMPEG_REFERENCE.md (FFmpeg command templates, tone mapping filters, bitrate guidelines)
 
 IMPORTANT — Read before writing:
 - Read internal/probes/types.go for DeviceCapabilities fields (see Phase 1 Inventory)
@@ -1046,6 +1062,9 @@ Smart TVs (Samsung Tizen, LG WebOS, Roku) have FIXED capabilities per model/firm
 Their web engines often have broken or incomplete API implementations, making JS probing
 unreliable. A curated database is more trustworthy (trust=0.90) than runtime probing.
 
+Reference: ../docs/DEVICE_DETECTION.md (Smart TV detection patterns, platform UA strings,
+trust scoring, validation rules for catching lying device APIs)
+
 IMPORTANT: internal/probes/curated.go ALREADY EXISTS from Phase 1 with:
 - CuratedDevice struct, CuratedDatabase struct, KnownIssue struct
 - NewCuratedDatabase(), Load(), AddDevice(), UpdateDevice(), RemoveDevice()
@@ -1145,6 +1164,11 @@ git push origin main
 ```
 Build the media library scanner that discovers and indexes media files.
 
+Reference docs:
+- ../docs/FFMPEG_REFERENCE.md (ffprobe commands, codec identification, metadata extraction)
+- ../docs/CONTAINER_FORMATS.md (container formats, file extensions, codec/container compatibility)
+- ../docs/CODEC_REFERENCE.md (codec profiles, levels, HDR type identification)
+
 Create in internal/media/:
 
 1. scanner.go
@@ -1189,6 +1213,10 @@ After completing 4.1, run: go build ./... && go test ./internal/media/...
 
 ```
 Build the streaming endpoints that serve media to clients.
+
+Reference docs:
+- ../docs/CONTAINER_FORMATS.md (HLS/DASH/CMAF manifest formats, codec strings in playlists)
+- ../docs/FFMPEG_REFERENCE.md (FFmpeg process management, HW accel encoding, segment output)
 
 Create in internal/api/:
 
@@ -1657,6 +1685,9 @@ git push origin main
 Build probe libraries that use platform-native APIs instead of browser APIs.
 These provide higher trust (0.85) than browser-based CodecProbe (0.50-0.80).
 
+Reference: ../docs/DEVICE_DETECTION.md (platform detection strategies, trust scoring,
+capability probing patterns for Smart TVs, Android, iOS)
+
 Platform strategy:
 - Tizen/WebOS: web-based -> CodecProbe JS + curated DB (already handled)
 - Android: MediaCodecList + MediaCodecInfo -> exhaustive HW decoder list
@@ -1734,9 +1765,16 @@ git push origin main
 
 | What | Where |
 |------|-------|
+| Docs index | `../docs/README.md` |
 | Architecture spec | `../docs/ARCHITECTURE.md` |
 | Language rationale | `../docs/LANGUAGE_AND_SCALABILITY.md` |
 | Web UI architecture | `../docs/WEB_UI.md` |
+| Codec reference | `../docs/CODEC_REFERENCE.md` |
+| Container formats | `../docs/CONTAINER_FORMATS.md` |
+| DRM reference | `../docs/DRM_REFERENCE.md` |
+| Device detection | `../docs/DEVICE_DETECTION.md` |
+| FFmpeg reference | `../docs/FFMPEG_REFERENCE.md` |
+| Jellyfin reference | `../docs/JELLYFIN_REFERENCE.md` |
 | OpenAPI spec | `api/openapi.yaml` (created in prompt 4.3) |
 | Default config | `configs/tenkile.yaml` (created in prompt 4.7) |
 | Jellyfin StreamBuilder (study) | `../jellyfin/MediaBrowser.Model/Dlna/StreamBuilder.cs` |

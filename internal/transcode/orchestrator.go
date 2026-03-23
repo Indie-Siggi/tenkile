@@ -138,7 +138,7 @@ func NewOrchestrator(inv *server.Inventory, policy QualityPreservationPolicy, su
 }
 
 // Decide makes a playback decision for the given media item and device.
-func (o *Orchestrator) Decide(_ context.Context, item *MediaItem, deviceCaps *probes.DeviceCapabilities) *PlaybackDecision {
+func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *probes.DeviceCapabilities) *PlaybackDecision {
 	start := time.Now()
 
 	decision := &PlaybackDecision{

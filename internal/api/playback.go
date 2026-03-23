@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -11,14 +12,16 @@ import (
 	"time"
 
 	"github.com/tenkile/tenkile/internal/probes"
+	"github.com/tenkile/tenkile/internal/transcode"
 	"github.com/tenkile/tenkile/pkg/codec"
 )
 
 // PlaybackHandlers holds playback-related API handlers
 type PlaybackHandlers struct {
-	validator *probes.Validator
-	cache     *probes.CapabilityCache
-	curatedDB *probes.CuratedDatabase
+	validator    *probes.Validator
+	cache        *probes.CapabilityCache
+	curatedDB    *probes.CuratedDatabase
+	orchestrator *transcode.Orchestrator
 }
 
 // NewPlaybackHandlers creates new playback handlers
@@ -26,11 +29,13 @@ func NewPlaybackHandlers(
 	validator *probes.Validator,
 	cache *probes.CapabilityCache,
 	curatedDB *probes.CuratedDatabase,
+	orchestrator *transcode.Orchestrator,
 ) *PlaybackHandlers {
 	return &PlaybackHandlers{
-		validator: validator,
-		cache:     cache,
-		curatedDB: curatedDB,
+		validator:    validator,
+		cache:        cache,
+		curatedDB:    curatedDB,
+		orchestrator: orchestrator,
 	}
 }
 
@@ -226,7 +231,7 @@ func (h *PlaybackHandlers) handlePlaybackDecision(w http.ResponseWriter, r *http
 		caps.SupportsDTS = req.HasDTS
 	}
 
-	decision, reason, transcodeOptions := h.makeDecision(caps, &req)
+	decision, reason, transcodeOptions := h.makeDecision(ctx, caps, &req)
 
 	resp := PlaybackDecisionResponse{
 		Decision:           decision,
@@ -240,6 +245,7 @@ func (h *PlaybackHandlers) handlePlaybackDecision(w http.ResponseWriter, r *http
 
 // makeDecision determines the playback decision
 func (h *PlaybackHandlers) makeDecision(
+	ctx context.Context,
 	caps *probes.DeviceCapabilities,
 	req *PlaybackDecisionRequest,
 ) (string, string, *TranscodeOptions) {
@@ -250,7 +256,64 @@ func (h *PlaybackHandlers) makeDecision(
 		}
 	}
 
-	// Check video codec compatibility
+	// Use orchestrator if available
+	if h.orchestrator != nil {
+		mediaItem := &transcode.MediaItem{
+			ID:            req.DeviceID, // Use device ID as media ID placeholder
+			VideoCodec:    req.VideoCodec,
+			AudioCodec:    req.AudioCodec,
+			Container:     req.Container,
+			Bitrate:       req.Bitrate,
+			IsHDR:         req.HasHDR,
+			IsDolbyVision: req.HasDolbyVision,
+			IsDolbyAtmos:  req.HasDolbyAtmos,
+		}
+		if req.Resolution != nil {
+			mediaItem.Width = req.Resolution.Width
+			mediaItem.Height = req.Resolution.Height
+		}
+		if req.StreamInfo != nil && len(req.StreamInfo.AudioStreams) > 0 {
+			mediaItem.AudioChannels = req.StreamInfo.AudioStreams[0].Channels
+			if req.StreamInfo.AudioStreams[0].Bitrate > 0 {
+				mediaItem.AudioBitrate = req.StreamInfo.AudioStreams[0].Bitrate
+			}
+		}
+		if req.StreamInfo != nil && len(req.StreamInfo.SubtitleStreams) > 0 {
+			mediaItem.SubtitleFormat = req.StreamInfo.SubtitleStreams[0].Codec
+		}
+
+		decision := h.orchestrator.Decide(ctx, mediaItem, caps)
+
+		// Convert orchestrator decision to API response
+		decisionStr := decision.Type.String()
+		reason := ""
+		if len(decision.Reasons) > 0 {
+			reason = decision.Reasons[0]
+		} else {
+			reason = "Orchestrator decision"
+		}
+
+		var transcodeOpts *TranscodeOptions
+		if decision.NeedsVideoTranscode || decision.NeedsAudioTranscode || decision.NeedsRemux {
+			transcodeOpts = &TranscodeOptions{
+				TargetVideoCodec: decision.TargetVideoCodec,
+				TargetAudioCodec: decision.TargetAudioCodec,
+				SubtitleMethod:   "embed",
+			}
+			if decision.TargetAudioChannels > 0 {
+				// Could add audio channel mapping info here
+			}
+			if decision.HDRPreserved {
+				transcodeOpts.RemoveHDR = false
+			} else if decision.NeedsVideoTranscode && req.HasHDR {
+				transcodeOpts.RemoveHDR = true
+			}
+		}
+
+		return decisionStr, reason, transcodeOpts
+	}
+
+	// Fallback to simple compatibility check if orchestrator is not available
 	videoCompatible := false
 	if len(caps.VideoCodecs) == 0 {
 		videoCompatible = true

@@ -17,6 +17,7 @@ import (
 	"github.com/tenkile/tenkile/internal/config"
 	"github.com/tenkile/tenkile/internal/database"
 	"github.com/tenkile/tenkile/internal/probes"
+	"github.com/tenkile/tenkile/internal/transcode"
 )
 
 // deviceIDRegex validates device ID format (alphanumeric, hyphens, underscores, max 64 chars)
@@ -38,12 +39,14 @@ func isValidNumericField(value int64, min, max int64) bool {
 // Router wraps chi.Router and holds handler dependencies
 type Router struct {
 	chi.Router
-	db          *database.SQLite
-	cfg         *config.Config
-	validator   *probes.Validator
-	cache       *probes.CapabilityCache
-	curatedDB   *probes.CuratedDatabase
-	rateLimiter *rateLimiter
+	db            *database.SQLite
+	cfg           *config.Config
+	validator     *probes.Validator
+	cache         *probes.CapabilityCache
+	curatedDB     *probes.CuratedDatabase
+	orchestrator  *transcode.Orchestrator
+	decisionLog   *transcode.DecisionLogger
+	rateLimiter   *rateLimiter
 
 	// Handlers
 	devices  *DeviceHandlers
@@ -52,11 +55,13 @@ type Router struct {
 }
 
 // NewRouter creates a new Chi router with configured middleware and handlers
-func NewRouter(cfg *config.Config, db *database.SQLite) http.Handler {
+func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.Orchestrator, decisionLog *transcode.DecisionLogger) http.Handler {
 	r := &Router{
-		Router: chi.NewRouter(),
-		db:     db,
-		cfg:    cfg,
+		Router:       chi.NewRouter(),
+		db:           db,
+		cfg:          cfg,
+		orchestrator: orchestrator,
+		decisionLog:  decisionLog,
 	}
 
 	// Initialize dependencies
@@ -82,10 +87,19 @@ func NewRouter(cfg *config.Config, db *database.SQLite) http.Handler {
 
 	r.curatedDB = probes.NewCuratedDatabase()
 
+	// Load curated devices from data directory
+	curatedPath := "./data/curated"
+	if err := r.curatedDB.Load(curatedPath); err != nil {
+		slog.Warn("Failed to load curated devices", "error", err)
+	}
+
 	// Initialize handlers
 	r.devices = NewDeviceHandlers(r.validator, r.cache, r.curatedDB)
-	r.playback = NewPlaybackHandlers(r.validator, r.cache, r.curatedDB)
+	r.playback = NewPlaybackHandlers(r.validator, r.cache, r.curatedDB, r.orchestrator)
 	r.admin = NewAdminHandlers(r.validator, r.cache, r.curatedDB)
+	if r.decisionLog != nil {
+		r.admin.SetDecisionLogger(r.decisionLog)
+	}
 
 	// Initialize rate limiter (100 requests per minute for public endpoints)
 	r.rateLimiter = newRateLimiter(100, time.Minute)
