@@ -7,16 +7,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/tenkile/tenkile/internal/probes"
+	"github.com/tenkile/tenkile/internal/transcode"
 )
 
 // AdminHandlers holds admin-related API handlers
 type AdminHandlers struct {
-	validator   *probes.Validator
-	cache       *probes.CapabilityCache
-	curatedDB   *probes.CuratedDatabase
+	validator      *probes.Validator
+	cache          *probes.CapabilityCache
+	curatedDB      *probes.CuratedDatabase
+	decisionLogger *transcode.DecisionLogger
 }
 
 // NewAdminHandlers creates new admin handlers
@@ -30,6 +33,11 @@ func NewAdminHandlers(
 		cache:       cache,
 		curatedDB:   curatedDB,
 	}
+}
+
+// SetDecisionLogger sets the decision logger for admin query endpoints.
+func (h *AdminHandlers) SetDecisionLogger(dl *transcode.DecisionLogger) {
+	h.decisionLogger = dl
 }
 
 // SystemInfoResponse represents system information
@@ -427,6 +435,75 @@ func (h *AdminHandlers) handleRemoveCuratedDevice(w http.ResponseWriter, r *http
 	}
 
 	RespondJSON(w, http.StatusOK, resp)
+}
+
+// handleGetDecisions handles decision log query requests.
+// GET /api/v1/admin/decisions?deviceId=X&from=date&to=date&limit=N&offset=N
+func (h *AdminHandlers) handleGetDecisions(w http.ResponseWriter, r *http.Request) {
+	if h.decisionLogger == nil {
+		RespondJSON(w, http.StatusServiceUnavailable, ErrorResponse{
+			Error:   "not_available",
+			Message: "Decision logger not configured",
+		})
+		return
+	}
+
+	q := transcode.DecisionQuery{
+		DeviceID: r.URL.Query().Get("deviceId"),
+		Limit:    100, // default
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+			q.Limit = v
+		}
+	}
+	const maxLimit = 1000
+	if q.Limit > maxLimit {
+		q.Limit = maxLimit
+	}
+
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+			q.Offset = v
+		}
+	}
+
+	if from := r.URL.Query().Get("from"); from != "" {
+		if t, err := time.Parse(time.RFC3339, from); err == nil {
+			q.From = t
+		} else if t, err := time.Parse("2006-01-02", from); err == nil {
+			q.From = t
+		}
+	}
+	if to := r.URL.Query().Get("to"); to != "" {
+		if t, err := time.Parse(time.RFC3339, to); err == nil {
+			q.To = t
+		} else if t, err := time.Parse("2006-01-02", to); err == nil {
+			q.To = t.Add(24*time.Hour - time.Nanosecond) // end of day
+		}
+	}
+
+	results := h.decisionLogger.Query(q)
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"decisions": results,
+		"count":     len(results),
+	})
+}
+
+// handleGetDecisionStats handles aggregate decision statistics requests.
+// GET /api/v1/admin/decisions/stats
+func (h *AdminHandlers) handleGetDecisionStats(w http.ResponseWriter, r *http.Request) {
+	if h.decisionLogger == nil {
+		RespondJSON(w, http.StatusServiceUnavailable, ErrorResponse{
+			Error:   "not_available",
+			Message: "Decision logger not configured",
+		})
+		return
+	}
+
+	stats := h.decisionLogger.Stats()
+	RespondJSON(w, http.StatusOK, stats)
 }
 
 // handleHealthCheck handles health check requests

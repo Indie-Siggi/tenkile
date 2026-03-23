@@ -197,6 +197,10 @@ func NewRouter(cfg *config.Config, db *database.SQLite) http.Handler {
 
 				adm.Get("/anomalies", r.admin.handleGetAnomalies)
 
+				// Decision log endpoints (Phase 2.3)
+				adm.Get("/decisions", r.admin.handleGetDecisions)
+				adm.Get("/decisions/stats", r.admin.handleGetDecisionStats)
+
 				adm.Post("/curated/device", r.admin.handleUpdateCuratedDevice)
 				adm.Post("/curated/device/{id}/verify", r.admin.handleVerifyDevice)
 				adm.Delete("/curated/device/{id}", r.admin.handleRemoveCuratedDevice)

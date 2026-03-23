@@ -64,6 +64,48 @@ Every agent prompt should end with a compilation check. Run `go build ./...` and
 ### Rule 9: Method signatures are contracts
 
 When calling methods on types from other files/packages, use the exact signature. Key signatures in this codebase:
+
+### Rule 10: Abstract all system calls behind interfaces
+
+Any code that calls `exec.Command`, `os.Stat`, `exec.LookPath`, reads device files, or probes the OS must go through an interface so tests can mock it. Do NOT use `runtime.GOOS` directly in logic — store it in a struct field set from `runtime.GOOS` at construction, with a `SetGOOS()` test override. Every external system interaction needs exactly one abstraction point.
+
+Pattern:
+```go
+// Interface in the same file that uses it
+type CommandRunner interface {
+    Run(ctx context.Context, name string, args ...string) (stdout, stderr []byte, err error)
+}
+
+// Real implementation
+type ExecRunner struct{}
+func (r *ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, []byte, error) { ... }
+
+// Constructor takes the interface
+func NewThing(runner CommandRunner) *Thing { ... }
+```
+
+This applies to: FFmpeg calls, `exec.LookPath`, device file checks (`os.Stat`), GPU detection commands (`nvidia-smi`, `vainfo`). Never use `which` (not portable) — use `exec.LookPath`. Never use `test -c` (not portable) — use `os.Stat` with `os.ModeCharDevice`.
+
+### Rule 11: Avoid repeated expensive operations
+
+When a function fetches data (e.g., running `ffmpeg -encoders`), pass the result to downstream functions rather than having each one re-fetch independently. This prevents TOCTOU bugs and reduces startup time.
+
+### Rule 12: Return copies of package-level collection data
+
+If a package exposes global lookup tables (maps, slices), getter functions must return copies, not references to the internal data. Callers modifying a returned slice would corrupt global state.
+
+```go
+// Wrong: returns internal slice
+func GetLadder(codec string) []string { return ladder[codec] }
+
+// Right: returns a copy
+func GetLadder(codec string) []string {
+    src := ladder[codec]
+    out := make([]string, len(src))
+    copy(out, src)
+    return out
+}
+```
 - `cache.Get(deviceID string) (*DeviceCapabilities, bool)` — returns `(value, found)`, NOT `(value, error)`
 - `cache.Set(deviceID string, caps *DeviceCapabilities, source string) error`
 - `NewCapabilityCache(config *CacheConfig) (*CapabilityCache, error)` — nil config = memory-only defaults
@@ -137,7 +179,7 @@ func ParseCodecProbeResult(probe *CodecProbeResult) (*DeviceCapabilities, error)
 - `router.go` — Chi router with middleware, `NewRouter(cfg, db) http.Handler`
 - `devices.go` — `DeviceHandlers` with probe report, capability lookup, validation, search
 - `playback.go` — `PlaybackHandlers` with decision, feedback, transcode, profiles, validate
-- `admin.go` — `AdminHandlers` with system info, stats, cache cleanup, curated device management
+- `admin.go` — `AdminHandlers` with system info, stats, cache cleanup, curated device management, decision log query
 - `response.go` — `RespondJSON(w, status, v)` and `ErrorResponse{Error, Message}`
 
 ### Package: `internal/config`
@@ -148,6 +190,107 @@ func ParseCodecProbeResult(probe *CodecProbeResult) (*DeviceCapabilities, error)
 
 ### Package: `cmd/tenkile`
 - `main.go` — Entry point, CLI flags, slog setup, HTTP server start
+
+---
+
+## Phase 2 Inventory (completed)
+
+Phase 2 is done. The following packages, types, and functions exist. Phase 3+ agents MUST use these — do not redefine them.
+
+### Package: `internal/server`
+
+**Type ownership:**
+
+| File | Types owned |
+|------|------------|
+| `inventory.go` | `HWAccelType`, `HardwareAcceleration`, `PerformanceEstimate`, `EncoderCapability`, `ServerCapabilities`, `CommandRunner`, `ExecRunner`, `FFmpegPathFinder`, `Inventory` |
+| `encoder.go` | `EncoderSelector` |
+| `benchmark.go` | `BenchmarkResult`, `Benchmarker` |
+
+**Key function signatures:**
+
+```go
+// Inventory
+func NewInventory(runner CommandRunner, logger *slog.Logger) *Inventory
+func (inv *Inventory) Discover(ctx context.Context) (*ServerCapabilities, error)
+func (inv *Inventory) GetCurrent() *ServerCapabilities
+func (inv *Inventory) SetGOOS(goos string)                     // testing only
+func (inv *Inventory) SetPathFinder(pf FFmpegPathFinder)       // testing only
+func (inv *Inventory) SetDeviceExistsFunc(fn func(string) bool) // testing only
+
+// ServerCapabilities
+func (sc *ServerCapabilities) CanEncode(codecName string) bool
+func (sc *ServerCapabilities) GetEncoders(codecName string) []EncoderCapability
+func (sc *ServerCapabilities) HasHWAccel() bool
+
+// EncoderSelector
+func NewEncoderSelector(caps *ServerCapabilities) *EncoderSelector
+func (s *EncoderSelector) SelectEncoder(targetCodec string, needsHDR bool, needs10Bit bool) *EncoderCapability
+func (s *EncoderSelector) CanEncodeCodec(codecName string) bool
+
+// Benchmarker
+func NewBenchmarker(runner CommandRunner, logger *slog.Logger) *Benchmarker
+func (b *Benchmarker) BenchmarkEncoder(ctx context.Context, ffmpegPath string, enc EncoderCapability) (*BenchmarkResult, error)
+func (b *Benchmarker) BenchmarkAll(ctx context.Context, ffmpegPath string, caps *ServerCapabilities) []BenchmarkResult
+```
+
+### Package: `internal/transcode`
+
+**Type ownership:**
+
+| File | Types owned |
+|------|------------|
+| `orchestrator.go` | `DecisionType`, `MediaItem`, `PlaybackDecision`, `Orchestrator` |
+| `quality.go` | `HdrPolicy`, `ToneMappingQuality`, `AudioChannelPolicy`, `BitDepthPolicy`, `ResolutionPolicy`, `QualityPreservationPolicy` |
+| `codec_ladder.go` | `audioTarget`, `GetVideoCodecLadder()`, `GetAudioCodecLadder()` |
+| `matcher.go` | `DeviceMatcher` |
+| `subtitle.go` | `SubtitleType`, `SubtitleDecision`, `SubtitleAction`, `SubtitleConfig` |
+| `legacy.go` | `LegacyContentFlags` |
+| `ffmpeg.go` | `FFmpegArgs` |
+| `logger.go` | `PlaybackDecisionLog`, `DecisionStats`, `DecisionQuery`, `DecisionLogger` |
+
+**Key function signatures:**
+
+```go
+// Orchestrator
+func NewOrchestrator(inv *server.Inventory, policy QualityPreservationPolicy, subConfig SubtitleConfig, logger *slog.Logger) *Orchestrator
+func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *probes.DeviceCapabilities) *PlaybackDecision
+
+// Quality
+func DefaultQualityPolicy() QualityPreservationPolicy
+
+// Codec ladders (return copies — safe to modify)
+func GetVideoCodecLadder(sourceCodec string) []string
+func GetAudioCodecLadder(sourceCodec string) []audioTarget
+
+// Subtitles
+func ClassifySubtitle(format string) SubtitleType
+func DecideSubtitle(subFormat string, deviceSupportsFormat bool, config SubtitleConfig) SubtitleDecision
+
+// Legacy
+func DetectLegacyContent(item *MediaItem) LegacyContentFlags
+func BuildLegacyFilterArgs(flags LegacyContentFlags) []string
+
+// FFmpeg
+func BuildFFmpegArgs(decision *PlaybackDecision, encoder *server.EncoderCapability, policy QualityPreservationPolicy) *FFmpegArgs
+func (a *FFmpegArgs) Build(inputPath, outputPath string) []string
+
+// Decision Logger
+func NewDecisionLogger(logger *slog.Logger) *DecisionLogger
+func (dl *DecisionLogger) Log(ctx context.Context, decision *PlaybackDecision, deviceID, mediaItemID string) *PlaybackDecisionLog
+func (dl *DecisionLogger) UpdateOutcome(id string, succeeded bool, failureReason string) bool
+func (dl *DecisionLogger) Query(q DecisionQuery) []*PlaybackDecisionLog
+func (dl *DecisionLogger) GetByID(id string) (*PlaybackDecisionLog, bool)
+func (dl *DecisionLogger) Stats() *DecisionStats
+```
+
+### Admin API additions (Phase 2)
+
+Routes added to `internal/api/router.go` under `/api/v1/admin/`:
+- `GET /decisions` — query decision logs (params: `deviceId`, `from`, `to`, `limit`, `offset`)
+- `GET /decisions/stats` — aggregate decision statistics
+
+`AdminHandlers` has a `SetDecisionLogger(dl *transcode.DecisionLogger)` method.
 
 ### Module dependencies (in go.mod)
 ```
@@ -657,16 +800,21 @@ Create in internal/server/:
 3. benchmark.go - Optional startup benchmark
    Encode small test clip to estimate real-time capability
 
-Use exec.Command for FFmpeg/nvidia-smi/vainfo interaction.
-Parse stdout/stderr for capability detection.
-
 IMPORTANT: This package is NEW (internal/server/). Do NOT import internal/probes/
 types or internal/transcode/ types — the server inventory is independent.
 The only shared dependency is pkg/codec/ for codec name constants.
 
-Write tests with mock command outputs (mock the exec.Command calls).
+Testability requirements (see Rule 10):
+- Define a CommandRunner interface for exec.Command calls
+- Use exec.LookPath (via FFmpegPathFinder interface) instead of `which` — `which` is not portable to Windows
+- Use os.Stat with os.ModeCharDevice (via deviceExistsFunc) instead of `test -c` — `test -c` is not portable
+- Store runtime.GOOS in a struct field with SetGOOS() override for tests
+- HW probe functions detect codecs by filtering the already-fetched encoder list — do NOT re-run `ffmpeg -encoders` in each probe method. Pass the list from Discover() through to all probe functions.
+- Audio encoders (aac, eac3, ac3, libopus, flac, libmp3lame, truehd, dca, libvorbis, alac) MUST be included in the encoder detail map alongside video encoders — the transcode engine checks server encoding capability for audio codecs too.
+
+Write tests with mock command outputs.
 Test: NVIDIA system, Intel QSV system, VAAPI Linux system, macOS VideoToolbox,
-software-only system, Raspberry Pi (V4L2).
+software-only system, Raspberry Pi (V4L2), no-FFmpeg error case.
 
 After completing 2.1, run: go build ./... && go test ./internal/server/...
 Fix all errors before proceeding to 2.2.
@@ -738,23 +886,37 @@ Create in internal/transcode/:
 4. orchestrator.go - Main decision flow:
    a. Get trusted device capabilities (from cache/probe)
    b. Get server encoding capabilities (from inventory)
-   c. Resolve subtitle decision FIRST
-   d. Try direct play: codec + container + bitrate all compatible?
+   c. Resolve subtitle decision FIRST (burn-in forces video transcode)
+   d. Try direct play: codec + container + bitrate + HDR all compatible?
+      - HDR content on non-HDR device CANNOT direct play (needs tone mapping)
+      - HdrAlwaysToneMap policy also prevents direct play of HDR content
    e. Try remux: codec compatible but container isn't?
    f. Walk video codec ladder: find first codec device supports AND server can encode
    g. Walk audio codec ladder: same logic, preserve channels
-   h. Absolute fallback: H.264/AAC/MP4
-   i. Verify server can produce the target in real-time
-   j. Log the full decision
+   h. Partial transcode: if video is direct-playable but audio isn't, copy video and only transcode audio
+   i. Absolute fallback: H.264/AAC/MP4
+   j. IMPORTANT: After selecting an encoder, verify it actually supports HDR passthrough
+      if HDR was requested. SelectEncoder may fall back to a non-HDR encoder silently.
+      If the selected encoder can't do HDR, switch to tone mapping.
+   k. Do NOT store an EncoderSelector on the Orchestrator struct — create a fresh one in
+      each Decide() call from inv.GetCurrent() so it picks up capability refreshes.
+   l. Log the full decision
 
 5. subtitle.go - Subtitle decision tree (see architecture doc)
+   - Include a streamIndex field (unexported) on SubtitleDecision for FFmpeg filter construction
+   - Set it from MediaItem.SubtitleIndex in the orchestrator
 
 6. legacy.go - Interlaced, anamorphic, SD content handling
+   - Use epsilon comparison (math.Abs(par - 1.0) > 0.001) for PixelAspectRatio, NOT exact float equality
 
 7. ffmpeg.go - Build FFmpeg args from TranscodeTarget
    TWO HDR paths:
-   a. HDR passthrough (device has HDR display): preserve metadata, 10-bit
-   b. HDR -> SDR tone mapping: libplacebo/zscale/reinhard, BT.2020->BT.709, 8-bit output
+   a. HDR passthrough (device has HDR display): preserve metadata, 10-bit (p010le),
+      BT.2020/smpte2084 color metadata
+   b. HDR -> SDR tone mapping: libplacebo/zscale/reinhard, BT.2020->BT.709, 8-bit output (yuv420p),
+      BT.709 color metadata
+   Subtitle burn-in: when SubtitleAction is BurnIn, add the actual `subtitles` video filter
+   with the stream index — do not just set `-c:s none` without compositing the subtitle.
 
 8. logger.go - PlaybackDecisionLog model and persistence
 
@@ -828,15 +990,35 @@ Create in internal/transcode/:
    to the existing AdminHandlers struct — do NOT create a new struct or file.
    Use the existing RespondJSON() helper from response.go.
 
-   GET /api/v1/admin/decisions?deviceId=X&from=date&to=date
+   GET /api/v1/admin/decisions?deviceId=X&from=date&to=date&limit=N&offset=N
    GET /api/v1/admin/decisions/stats (aggregate: direct play %, transcode %,
        HDR preservation %, avg trust, failure rate)
+
+   IMPORTANT: Parse ALL documented query params (limit, offset, deviceId, from, to).
+   Validate and cap limit (max 1000) to prevent clients from dumping the entire log.
+   Parse from/to as both RFC3339 and date-only (YYYY-MM-DD) formats.
 
    Register new routes in router.go inside the existing admin Route group.
 
 After completing 2.3, run: go build ./... && go test ./...
 Fix all errors before committing.
 ```
+
+### Lessons from Phase 2 Implementation
+
+These issues were discovered during Phase 2 development and code review. Future phases should avoid these patterns:
+
+1. **Audio encoders matter.** The server inventory initially only mapped video encoder names to codecs. The transcode engine's `CanEncodeCodec("eac3")` returned false because eac3 wasn't in the encoder details. Audio encoders (aac, eac3, ac3, libopus, flac, libmp3lame, truehd, dca, libvorbis, alac) must be in the encoder map.
+
+2. **runtime.GOOS breaks tests.** HW probing dispatches on OS — NVIDIA/QSV/VAAPI only probe on Linux, VideoToolbox only on Darwin. Tests running on macOS never exercised Linux-only paths. Solution: store `goos` as a struct field, set from `runtime.GOOS`, with `SetGOOS()` for tests.
+
+3. **FFmpeg output parsing is tricky.** The `ffmpeg -encoders` output has header lines like `V..... = Video` where `=` matches the regex for codec names. Filter these with `if name == "=" { continue }`.
+
+4. **The orchestrator must handle partial transcodes.** When video is direct-playable but audio isn't (e.g., HEVC HDR10 + DTS-HD on a device that supports HEVC+HDR but only AAC audio), copy video and transcode only audio. This is a common real-world scenario.
+
+5. **HDR encoder verification is essential.** `SelectEncoder()` does graceful degradation — if no HDR-capable encoder exists, it returns the best non-HDR encoder. The orchestrator MUST check `encoder.SupportsHDRPassthrough` after selection and fall back to tone mapping if the encoder can't actually do HDR. Otherwise the decision claims "HDR preserved" but the encoder drops the metadata.
+
+6. **Subtitle burn-in needs the actual filter.** It's not enough to set `-c:s none` — you must also add the `subtitles=si=N` video filter to actually composite the subtitle onto the video stream.
 
 ### Phase 2 Checkpoint: Git Commit
 
