@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/tenkile/tenkile/internal/events"
 	"github.com/tenkile/tenkile/internal/probes"
 	"github.com/tenkile/tenkile/internal/server"
 	"github.com/tenkile/tenkile/pkg/codec"
@@ -174,6 +175,18 @@ func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *
 	// Step 4: Transcode — walk codec ladders
 	o.buildTranscode(item, deviceCaps, decision)
 	decision.DecisionDurationMs = time.Since(start).Milliseconds()
+
+	// Publish transcode started event
+	if decision.NeedsVideoTranscode || decision.NeedsAudioTranscode {
+		events.PublishEvent(events.EventTranscodeStarted, events.TopicTranscodes, events.TranscodePayload{
+			MediaItemID: item.ID,
+			MediaTitle:  item.Title,
+			SourceCodec: item.VideoCodec,
+			TargetCodec: decision.TargetVideoCodec,
+			Status:      "started",
+		})
+	}
+
 	return decision
 }
 

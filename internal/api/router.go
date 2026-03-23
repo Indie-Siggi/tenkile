@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/tenkile/tenkile/internal/config"
 	"github.com/tenkile/tenkile/internal/database"
+	"github.com/tenkile/tenkile/internal/events"
 	"github.com/tenkile/tenkile/internal/probes"
 	"github.com/tenkile/tenkile/internal/transcode"
 )
@@ -48,6 +49,7 @@ type Router struct {
 	decisionLog   *transcode.DecisionLogger
 	rateLimiter   *rateLimiter
 	feedbackManager *probes.FeedbackManager
+	wsHub         *events.WebSocketHub
 
 	// Handlers
 	devices  *DeviceHandlers
@@ -64,6 +66,10 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		orchestrator: orchestrator,
 		decisionLog:  decisionLog,
 	}
+
+	// Initialize WebSocket hub
+	r.wsHub = events.NewWebSocketHub(nil)
+	go r.wsHub.Run()
 
 	// Initialize dependencies
 	r.validator = probes.NewValidator()
@@ -137,6 +143,9 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 
 	// Health check endpoint
 	r.Get("/health", r.healthCheckHandler)
+
+	// WebSocket endpoint for real-time events
+	r.Get("/ws", r.wsHub.ServeWS)
 
 	// API v1 routes — use different variable names to avoid shadowing Router receiver
 	r.Route("/api/v1", func(api chi.Router) {

@@ -1,0 +1,207 @@
+package media
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/tenkile/tenkile/internal/events"
+)
+
+// Media extensions to scan
+var MediaExtensions = map[string]bool{
+    ".mkv":  true,
+    ".mp4":  true,
+    ".m4v":  true,
+    ".avi":  true,
+    ".mov":  true,
+    ".wmv":  true,
+    ".webm": true,
+    ".ts":   true,
+    ".m2ts": true,
+    ".flv":  true,
+    ".mpg":  true,
+    ".mpeg": true,
+    ".3gp":  true,
+}
+
+// Patterns to skip
+var SkipPatterns = []string{
+    "/sample/",
+    "/samples/",
+    "/extras/",
+    "/bonus/",
+    "/trailers/",
+    "/.AppleDouble",
+    "/.DS_Store",
+}
+
+// Scanner handles media library scanning
+type Scanner struct {
+    ffprobe    *FFprobe
+    store      *Store
+    mu         sync.RWMutex
+    scanStatus map[string]*LibraryScanStatus
+}
+
+// NewScanner creates a new media scanner
+func NewScanner(ffprobe *FFprobe, store *Store) *Scanner {
+    return &Scanner{
+        ffprobe:    ffprobe,
+        store:      store,
+        scanStatus: make(map[string]*LibraryScanStatus),
+    }
+}
+
+// ScanLibrary scans a library path and indexes all media files
+func (s *Scanner) ScanLibrary(ctx context.Context, lib *Library) error {
+    s.updateStatus(lib.ID, &LibraryScanStatus{
+        LibraryID: lib.ID,
+        Status:    ScanStatusScanning,
+        StartedAt:  timePtr(time.Now()),
+    })
+
+    // Publish scan started event
+    events.PublishEvent(events.EventLibraryScanStarted, events.TopicLibraries, events.LibraryScanPayload{
+        LibraryID:   lib.ID,
+        LibraryName: lib.Name,
+        TotalFiles:  0,
+        Status:      string(ScanStatusScanning),
+    })
+
+    // Walk directory
+    var files []string
+    err := filepath.Walk(lib.Path, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return nil // Skip errors
+        }
+
+        // Skip directories
+        if info.IsDir() {
+            return nil
+        }
+
+        // Check if should skip
+        for _, pattern := range SkipPatterns {
+            if strings.Contains(path, pattern) {
+                return nil
+            }
+        }
+
+        // Check extension
+        ext := strings.ToLower(filepath.Ext(path))
+        if !MediaExtensions[ext] {
+            return nil
+        }
+
+        files = append(files, path)
+        return nil
+    })
+
+    if err != nil {
+        s.updateStatus(lib.ID, &LibraryScanStatus{
+            LibraryID: lib.ID,
+            Status:    ScanStatusError,
+            Error:     err.Error(),
+        })
+        // Publish scan error event
+        events.PublishEvent(events.EventLibraryScanError, events.TopicLibraries, events.LibraryScanPayload{
+            LibraryID: lib.ID,
+            LibraryName: lib.Name,
+            Status:    string(ScanStatusError),
+            Error:    err.Error(),
+        })
+        return err
+    }
+
+    // Update total
+    s.updateStatus(lib.ID, &LibraryScanStatus{
+        LibraryID:  lib.ID,
+        Status:     ScanStatusScanning,
+        TotalFiles: len(files),
+        Processed:  0,
+    })
+
+    // Process files
+    for i, path := range files {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        item, err := s.ffprobe.Probe(ctx, path)
+        if err != nil {
+            // Log but continue
+            continue
+        }
+
+        item.LibraryID = lib.ID
+
+        // Save to store
+        if err := s.store.SaveMediaItem(ctx, item); err != nil {
+            // Log but continue
+            continue
+        }
+
+        // Update progress
+        s.updateStatus(lib.ID, &LibraryScanStatus{
+            LibraryID:   lib.ID,
+            Status:       ScanStatusScanning,
+            TotalFiles:   len(files),
+            Processed:    i + 1,
+            CurrentFile:  path,
+        })
+
+        // Publish progress event (every 10 files or on last file)
+        if (i+1)%10 == 0 || i+1 == len(files) {
+            events.PublishEvent(events.EventLibraryScanProgress, events.TopicLibraries, events.LibraryScanPayload{
+                LibraryID:   lib.ID,
+                LibraryName: lib.Name,
+                TotalFiles:  len(files),
+                Processed:   i + 1,
+                CurrentFile: path,
+                Status:      string(ScanStatusScanning),
+            })
+        }
+    }
+
+    // Mark complete
+    s.updateStatus(lib.ID, &LibraryScanStatus{
+        LibraryID:  lib.ID,
+        Status:     ScanStatusCompleted,
+        TotalFiles: len(files),
+        Processed:  len(files),
+    })
+
+    // Publish scan complete event
+    events.PublishEvent(events.EventLibraryScanComplete, events.TopicLibraries, events.LibraryScanPayload{
+        LibraryID:   lib.ID,
+        LibraryName: lib.Name,
+        TotalFiles:  len(files),
+        Processed:   len(files),
+        Status:      string(ScanStatusCompleted),
+    })
+
+    return nil
+}
+
+// GetStatus returns the current scan status for a library
+func (s *Scanner) GetStatus(libraryID string) *LibraryScanStatus {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    return s.scanStatus[libraryID]
+}
+
+func (s *Scanner) updateStatus(libraryID string, status *LibraryScanStatus) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.scanStatus[libraryID] = status
+}
+
+func timePtr(t time.Time) *time.Time {
+    return &t
+}

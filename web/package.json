@@ -1,0 +1,21 @@
+{
+  "name": "tenkile-web",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tenkile Media Server Web Client",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "preact": "^10.19.3",
+    "preact-router": "^4.1.2",
+    "@preact/signals": "^1.2.2",
+    "hls.js": "^1.5.1"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.8.1",
+    "vite": "^5.0.12"
+  }
+}
