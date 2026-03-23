@@ -10,8 +10,9 @@ import (
 
 // ErrorResponse represents a JSON error response.
 type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
+	Error   string      `json:"error"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
 }
 
 // RespondJSON writes a JSON response with the given status code.

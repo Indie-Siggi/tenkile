@@ -47,6 +47,7 @@ type Router struct {
 	orchestrator  *transcode.Orchestrator
 	decisionLog   *transcode.DecisionLogger
 	rateLimiter   *rateLimiter
+	feedbackManager *probes.FeedbackManager
 
 	// Handlers
 	devices  *DeviceHandlers
@@ -93,8 +94,12 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		slog.Warn("Failed to load curated devices", "error", err)
 	}
 
+	// Initialize feedback manager (Phase 3.2)
+	r.feedbackManager = probes.NewFeedbackManager()
+
 	// Initialize handlers
 	r.devices = NewDeviceHandlers(r.validator, r.cache, r.curatedDB)
+	r.devices.SetFeedbackManager(r.feedbackManager)
 	r.playback = NewPlaybackHandlers(r.validator, r.cache, r.curatedDB, r.orchestrator)
 	r.admin = NewAdminHandlers(r.validator, r.cache, r.curatedDB)
 	if r.decisionLog != nil {
@@ -162,6 +167,14 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 			auth.Get("/devices/codecs/{codec}", r.devices.handleGetDevicesByCodec)
 			auth.Get("/device/{id}/profile", r.devices.handleGetDeviceProfile)
 
+			// Phase 3.2: Playback Feedback endpoints
+			auth.Post("/devices/{id}/feedback", r.devices.handlePlaybackFeedback)
+			auth.Get("/devices/{id}/feedback/stats", r.devices.handleGetPlaybackStats)
+			auth.Get("/devices/{id}/reliable-codecs", r.devices.handleGetReliableCodecs)
+			auth.Post("/devices/{id}/reprobe", r.devices.handleReProbeDevice)
+			auth.Get("/devices/{id}/trust", r.devices.handleGetTrustReport)
+			auth.Get("/feedback/metrics", r.devices.handleGetFeedbackMetrics)
+
 			// Playback endpoints
 			auth.Post("/playback/decision", r.playback.handlePlaybackDecision)
 			auth.Post("/playback/feedback", r.playback.handlePlaybackFeedback)
@@ -218,6 +231,18 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 				adm.Post("/curated/device", r.admin.handleUpdateCuratedDevice)
 				adm.Post("/curated/device/{id}/verify", r.admin.handleVerifyDevice)
 				adm.Delete("/curated/device/{id}", r.admin.handleRemoveCuratedDevice)
+
+				// Phase 3.1: Extended curated device management
+				adm.Put("/curated/devices", r.admin.handleCreateCuratedDevice)
+				adm.Put("/curated/devices/{id}", r.admin.handlePutCuratedDevice)
+				adm.Delete("/curated/devices/{id}", r.admin.handleDeleteCuratedDevice)
+				adm.Post("/curated/devices/{id}/vote", r.admin.handleVoteCuratedDevice)
+				adm.Post("/curated/search", r.admin.handleFuzzySearchCuratedDevices)
+				adm.Post("/curated/version-match", r.admin.handleVersionMatch)
+				adm.Get("/curated/embedded/stats", r.admin.handleGetEmbeddedStats)
+				adm.Post("/curated/embedded/sync", r.admin.handleSyncEmbeddedToCuratedDB)
+				adm.Get("/curated/export", r.admin.handleExportCuratedDevices)
+				adm.Post("/curated/import", r.admin.handleImportCuratedDevices)
 
 				adm.Get("/stats", r.adminStatsHandler)
 				adm.Post("/migrations", r.runMigrationsHandler)

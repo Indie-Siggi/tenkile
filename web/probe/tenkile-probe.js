@@ -1119,3 +1119,562 @@
  * @property {number} duration - Probe duration in milliseconds
  * @property {Object} [result] - Server response (if sent)
  */
+
+/**
+ * PlaybackTracker - Tracks HTML5 video playback events and reports outcomes
+ * @class
+ */
+class PlaybackTracker {
+	/**
+	 * Creates a new PlaybackTracker instance
+	 * @param {Object} options - Configuration options
+	 * @param {string} options.serverUrl - Base URL for the Tenkile server
+	 * @param {string} options.deviceId - Device ID for reporting
+	 * @param {Object} options.capabilities - Device capabilities from TenkileProbe
+	 * @param {number} [options.maxRetries=3] - Maximum retry attempts
+	 * @param {number} [options.timeout=5000] - Request timeout in milliseconds
+	 * @param {number} [options.bufferThreshold=0.5] - Buffer health threshold (0-1)
+	 * @param {number} [options.stallThreshold=3000] - Stall detection threshold in ms
+	 */
+	constructor(options = {}) {
+		this.serverUrl = options.serverUrl || '';
+		this.deviceId = options.deviceId || '';
+		this.capabilities = options.capabilities || {};
+		this.maxRetries = options.maxRetries || 3;
+		this.timeout = options.timeout || 5000;
+		this.bufferThreshold = options.bufferThreshold || 0.5;
+		this.stallThreshold = options.stallThreshold || 3000;
+
+		// State
+		this._currentVideo = null;
+		this._mediaInfo = null;
+		// Use circular buffer for event history to avoid memory leak
+		this._eventHistory = {
+			buffer: new Array(100),
+			index: 0,
+			count: 0,
+			push(event) {
+				this.buffer[this.index] = event;
+				this.index = (this.index + 1) % 100;
+				if (this.count < 100) this.count++;
+			},
+			getAll() {
+				const result = [];
+				const start = this.count < 100 ? 0 : this.index;
+				for (let i = 0; i < this.count; i++) {
+					result.push(this.buffer[(start + i) % 100]);
+				}
+				return result;
+			}
+		};
+		this._bufferingEvents = [];
+		this._startTime = null;
+		this._lastProgressTime = null;
+		this._stallTimer = null;
+		this._retryCount = 0;
+		this._maxRetries = 3;
+		this._retryDelay = 1000;
+		this._isTracking = false;
+
+		// Statistics
+		this._stats = {
+			totalPlaybacks: 0,
+			successfulPlaybacks: 0,
+			failedPlaybacks: 0,
+			totalBufferingMs: 0,
+			bufferingEvents: 0
+		};
+
+		// Bound event handlers
+		this._boundHandlers = {};
+	}
+
+	/**
+	 * Starts tracking a video element
+	 * @param {HTMLVideoElement} video - Video element to track
+	 * @param {Object} mediaInfo - Media information (codec, container, etc.)
+	 */
+	startTracking(video, mediaInfo = {}) {
+		if (this._isTracking) {
+			this.stopTracking();
+		}
+
+		this._currentVideo = video;
+		this._mediaInfo = {
+			mediaId: mediaInfo.mediaId || '',
+			videoCodec: mediaInfo.videoCodec || this._extractCodec(mediaInfo),
+			audioCodec: mediaInfo.audioCodec || '',
+			container: mediaInfo.container || this._extractContainer(video.src),
+			resolution: mediaInfo.resolution || `${video.videoWidth || 0}x${video.videoHeight || 0}`,
+			bitrate: mediaInfo.bitrate || 0,
+			duration: video.duration || 0
+		};
+		this._startTime = Date.now();
+		this._lastProgressTime = Date.now();
+		this._isTracking = true;
+		this._stats.totalPlaybacks++;
+
+		// Bind event handlers
+		this._bindHandlers();
+
+		console.log('[PlaybackTracker] Started tracking', this._mediaInfo);
+	}
+
+	/**
+	 * Stops tracking the current video
+	 */
+	stopTracking() {
+		if (!this._isTracking) return;
+
+		// Unbind event handlers
+		this._unbindHandlers();
+
+		// Clear stall timer
+		if (this._stallTimer) {
+			clearTimeout(this._stallTimer);
+			this._stallTimer = null;
+		}
+
+		this._currentVideo = null;
+		this._mediaInfo = null;
+		this._isTracking = false;
+
+		console.log('[PlaybackTracker] Stopped tracking');
+	}
+
+	/**
+	 * Reports a successful playback
+	 * @param {Object} additionalInfo - Additional information to include
+	 */
+	reportSuccess(additionalInfo = {}) {
+		const duration = Date.now() - (this._startTime || Date.now());
+		const bufferingDuration = this._bufferingEvents.reduce((sum, e) => sum + e.duration, 0);
+
+		const feedback = {
+			mediaId: this._mediaInfo?.mediaId || '',
+			outcome: 'success',
+			durationSeconds: duration / 1000,
+			bufferDurationSeconds: bufferingDuration / 1000,
+			networkQuality: this._getNetworkQuality(),
+			...this._getMediaDetails(),
+			...additionalInfo
+		};
+
+		this._sendFeedback(feedback);
+		this._stats.successfulPlaybacks++;
+
+		console.log('[PlaybackTracker] Reported success', feedback);
+	}
+
+	/**
+	 * Reports a failed playback
+	 * @param {string} outcome - Failure outcome type
+	 * @param {string} errorCode - Error code
+	 * @param {string} errorMessage - Error message
+	 * @param {Object} additionalInfo - Additional information
+	 */
+	reportFailure(outcome, errorCode, errorMessage, additionalInfo = {}) {
+		const duration = Date.now() - (this._startTime || Date.now());
+		const bufferingDuration = this._bufferingEvents.reduce((sum, e) => sum + e.duration, 0);
+
+		const feedback = {
+			mediaId: this._mediaInfo?.mediaId || '',
+			outcome: outcome,
+			errorCode: errorCode,
+			errorMessage: errorMessage,
+			durationSeconds: duration / 1000,
+			bufferDurationSeconds: bufferingDuration / 1000,
+			networkQuality: this._getNetworkQuality(),
+			...this._getMediaDetails(),
+			...additionalInfo
+		};
+
+		this._sendFeedback(feedback);
+		this._stats.failedPlaybacks++;
+
+		console.log('[PlaybackTracker] Reported failure', feedback);
+	}
+
+	/**
+	 * Gets current tracking statistics
+	 * @returns {Object} Statistics
+	 */
+	getStats() {
+		return {
+			...this._stats,
+			successRate: this._stats.totalPlaybacks > 0 
+				? this._stats.successfulPlaybacks / this._stats.totalPlaybacks 
+				: 0,
+			averageBufferingMs: this._stats.bufferingEvents > 0 
+				? this._stats.totalBufferingMs / this._stats.bufferingEvents 
+				: 0
+		};
+	}
+
+	/**
+	 * Resets tracking statistics
+	 */
+	resetStats() {
+		this._stats = {
+			totalPlaybacks: 0,
+			successfulPlaybacks: 0,
+			failedPlaybacks: 0,
+			totalBufferingMs: 0,
+			bufferingEvents: 0
+		};
+	}
+
+	// --- Private Methods ---
+
+	_bindHandlers() {
+		if (!this._currentVideo) return;
+
+		const video = this._currentVideo;
+
+		// Playback events
+		this._boundHandlers.playing = () => this._onPlaying();
+		this._boundHandlers.pause = () => this._onPause();
+		this._boundHandlers.ended = () => this._onEnded();
+		this._boundHandlers.waiting = () => this._onWaiting();
+		this._boundHandlers.canplay = () => this._onCanPlay();
+		this._boundHandlers.canplaythrough = () => this._onCanPlayThrough();
+
+		// Error events
+		this._boundHandlers.error = () => this._onError();
+		this._boundHandlers.stalled = () => this._onStalled();
+
+		// Progress events
+		this._boundHandlers.progress = () => this._onProgress();
+		this._boundHandlers.timeupdate = () => this._onTimeUpdate();
+		this._boundHandlers.loadedmetadata = () => this._onLoadedMetadata();
+
+		// Network events
+		this._boundHandlers.suspend = () => this._onSuspend();
+		this._boundHandlers.abort = () => this._onAbort();
+		this._boundHandlers.emptied = () => this._onEmptied();
+
+		// Rate change
+		this._boundHandlers.ratechange = () => this._onRateChange();
+
+		// Add listeners
+		for (const [event, handler] of Object.entries(this._boundHandlers)) {
+			video.addEventListener(event, handler);
+		}
+	}
+
+	_unbindHandlers() {
+		if (!this._currentVideo) return;
+
+		const video = this._currentVideo;
+		for (const [event, handler] of Object.entries(this._boundHandlers)) {
+			video.removeEventListener(event, handler);
+		}
+		this._boundHandlers = {};
+	}
+
+	_onPlaying() {
+		// Clear stall timer
+		if (this._stallTimer) {
+			clearTimeout(this._stallTimer);
+			this._stallTimer = null;
+		}
+
+		// Record event
+		this._recordEvent('playing');
+
+		// Clear any previous buffering event
+		const currentBuffering = this._bufferingEvents[this._bufferingEvents.length - 1];
+		if (currentBuffering && !currentBuffering.endTime) {
+			currentBuffering.endTime = Date.now();
+			currentBuffering.duration = currentBuffering.endTime - currentBuffering.startTime;
+			this._stats.totalBufferingMs += currentBuffering.duration;
+		}
+	}
+
+	_onPause() {
+		this._recordEvent('pause');
+	}
+
+	_onEnded() {
+		this._recordEvent('ended');
+		this.reportSuccess({ completed: true });
+	}
+
+	_onWaiting() {
+		// Start buffering tracking
+		const bufferingEvent = {
+			type: 'buffering',
+			startTime: Date.now(),
+			endTime: null,
+			duration: 0
+		};
+		this._bufferingEvents.push(bufferingEvent);
+		this._stats.bufferingEvents++;
+
+		// Start stall timer
+		this._stallTimer = setTimeout(() => {
+			this._onStallTimeout();
+		}, this.stallThreshold);
+	}
+
+	_onCanPlay() {
+		this._recordEvent('canplay');
+	}
+
+	_onCanPlayThrough() {
+		this._recordEvent('canplaythrough');
+	}
+
+	_onError() {
+		const error = this._currentVideo?.error;
+		if (!error) return;
+
+		let outcome = 'unknown';
+		let errorCode = 'UNKNOWN';
+		let errorMessage = 'Unknown error';
+
+		switch (error.code) {
+			case MediaError.MEDIA_ERR_ABORTED:
+				outcome = 'network_error';
+				errorCode = 'MEDIA_ERR_ABORTED';
+				errorMessage = 'Playback aborted by user';
+				break;
+			case MediaError.MEDIA_ERR_NETWORK:
+				outcome = 'network_error';
+				errorCode = 'MEDIA_ERR_NETWORK';
+				errorMessage = 'Network error occurred';
+				break;
+			case MediaError.MEDIA_ERR_DECODE:
+				outcome = 'decoding_failed';
+				errorCode = 'MEDIA_ERR_DECODE';
+				errorMessage = 'Media decoding error';
+				break;
+			case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+				outcome = 'unsupported_format';
+				errorCode = 'MEDIA_ERR_SRC_NOT_SUPPORTED';
+				errorMessage = 'Media format not supported';
+				break;
+		}
+
+		this.reportFailure(outcome, errorCode, errorMessage);
+	}
+
+	_onStalled() {
+		this._recordEvent('stalled');
+		
+		// Treat as temporary stall - don't report immediately
+		// The stall timer will handle reporting if it persists
+	}
+
+	_onStallTimeout() {
+		// Stall persisted - report as buffering issue
+		this.reportFailure('buffering', 'STALL_TIMEOUT', 'Playback stalled for too long');
+	}
+
+	_onProgress() {
+		// Check buffer health
+		if (this._currentVideo && this._currentVideo.buffered.length > 0) {
+			const bufferedEnd = this._currentVideo.buffered.end(this._currentVideo.buffered.length - 1);
+			const currentTime = this._currentVideo.currentTime;
+			const duration = this._currentVideo.duration;
+			
+			const bufferAhead = bufferedEnd - currentTime;
+			const bufferHealth = duration > 0 ? bufferAhead / duration : 0;
+
+			if (bufferHealth < this.bufferThreshold) {
+				// Low buffer health - might indicate issues
+				console.log('[PlaybackTracker] Low buffer health:', bufferHealth);
+			}
+		}
+	}
+
+	_onTimeUpdate() {
+		this._lastProgressTime = Date.now();
+
+		// Clear stall timer if we're making progress
+		if (this._stallTimer) {
+			clearTimeout(this._stallTimer);
+			this._stallTimer = null;
+		}
+	}
+
+	_onLoadedMetadata() {
+		this._recordEvent('loadedmetadata');
+
+		// Update media info with actual dimensions
+		if (this._currentVideo) {
+			this._mediaInfo = {
+				...this._mediaInfo,
+				resolution: `${this._currentVideo.videoWidth}x${this._currentVideo.videoHeight}`
+			};
+		}
+	}
+
+	_onSuspend() {
+		this._recordEvent('suspend');
+	}
+
+	_onAbort() {
+		this.reportFailure('network_error', 'ABORT', 'Playback aborted');
+	}
+
+	_onEmptied() {
+		this._recordEvent('emptied');
+	}
+
+	_onRateChange() {
+		this._recordEvent('ratechange');
+	}
+
+	_recordEvent(type) {
+		this._eventHistory.push({
+			type,
+			time: Date.now()
+		});
+	}
+
+	_extractCodec(mediaInfo) {
+		// Try to extract codec from capabilities
+		if (this.capabilities?.videoCodecs?.length > 0) {
+			return this.capabilities.videoCodecs[0];
+		}
+		return mediaInfo.codec || '';
+	}
+
+	_extractContainer(src) {
+		if (!src) return '';
+		const match = src.match(/\.([^.?#]+)(\?|$)/);
+		return match ? match[1].toLowerCase() : '';
+	}
+
+	_getMediaDetails() {
+		return {
+			videoCodec: this._mediaInfo?.videoCodec || '',
+			audioCodec: this._mediaInfo?.audioCodec || '',
+			container: this._mediaInfo?.container || '',
+			resolution: this._mediaInfo?.resolution || '',
+			bitrate: this._mediaInfo?.bitrate || 0
+		};
+	}
+
+	_getNetworkQuality() {
+		if (!navigator.connection) return 'unknown';
+
+		const connection = navigator.connection;
+		const effectiveType = connection.effectiveType || 'unknown';
+
+		// Map to qualitative levels
+		const qualityMap = {
+			'slow-2g': 'poor',
+			'2g': 'poor',
+			'3g': 'fair',
+			'4g': 'good'
+		};
+
+		return qualityMap[effectiveType] || 'unknown';
+	}
+
+	async _sendFeedback(feedback) {
+		const url = `${this.serverUrl}/api/v1/devices/${this.deviceId}/feedback`;
+
+		const payload = {
+			deviceId: this.deviceId,
+			mediaId: feedback.mediaId,
+			outcome: feedback.outcome,
+			errorCode: feedback.errorCode || undefined,
+			errorMessage: feedback.errorMessage || undefined,
+			durationSeconds: feedback.durationSeconds,
+			bufferDurationSeconds: feedback.bufferDurationSeconds,
+			networkQuality: feedback.networkQuality,
+			videoCodec: feedback.videoCodec,
+			audioCodec: feedback.audioCodec,
+			container: feedback.container,
+			resolution: feedback.resolution,
+			bitrate: feedback.bitrate
+		};
+
+		// Remove undefined values
+		Object.keys(payload).forEach(key => {
+			if (payload[key] === undefined) delete payload[key];
+		});
+
+		// Exponential backoff retry
+		let lastError = null;
+		for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+			try {
+				const response = await fetch(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Accept': 'application/json'
+					},
+					body: JSON.stringify(payload),
+					signal: AbortSignal.timeout(this.timeout)
+				});
+
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}`);
+				}
+
+				return await response.json();
+			} catch (error) {
+				lastError = error;
+				console.log(`[PlaybackTracker] Feedback send failed (attempt ${attempt + 1}):`, error.message);
+
+				if (attempt < this.maxRetries) {
+					const delay = this._retryDelay * Math.pow(2, attempt);
+					await new Promise(resolve => setTimeout(resolve, delay));
+				}
+			}
+		}
+
+		console.error('[PlaybackTracker] Failed to send feedback after retries:', lastError);
+	}
+}
+
+/**
+ * Creates a playback tracker for a video element
+ * @param {HTMLVideoElement} video - Video element to track
+ * @param {Object} options - Configuration options
+ * @returns {PlaybackTracker} PlaybackTracker instance
+ */
+function createPlaybackTracker(video, options = {}) {
+	return new PlaybackTracker(options);
+}
+
+// Export for different module systems
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = {
+		TenkileProbe,
+		createProbe,
+		quickProbe,
+		PlaybackTracker,
+		createPlaybackTracker
+	};
+} else if (typeof define === 'function' && define.amd) {
+	define([], function () {
+		return {
+			TenkileProbe: TenkileProbe,
+			createProbe: createProbe,
+			quickProbe: quickProbe,
+			PlaybackTracker: PlaybackTracker,
+			createPlaybackTracker: createPlaybackTracker
+		};
+	});
+} else {
+	// Global
+	global.TenkileProbe = TenkileProbe;
+	global.createProbe = createProbe;
+	global.quickProbe = quickProbe;
+	global.PlaybackTracker = PlaybackTracker;
+	global.createPlaybackTracker = createPlaybackTracker;
+}
+
+// Polyfill for AbortSignal.timeout (older browsers)
+if (!('timeout' in AbortSignal.prototype)) {
+	AbortSignal.timeout = function(ms) {
+		const controller = new AbortController();
+		setTimeout(() => controller.abort(), ms);
+		return controller.signal;
+	};
+}

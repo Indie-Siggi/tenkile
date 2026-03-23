@@ -1,0 +1,306 @@
+{
+  "_metadata": {
+    "platform": "hisense_smart_tv",
+    "manufacturer": "Hisense",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Hisense Smart TV device profiles covering both Android TV and Vidaa OS platforms. Codec support varies significantly between platforms and model years."
+  },
+  "devices": [
+    {
+      "id": "hisense-u8h-2022",
+      "device_hash": "hisense|androidtv|u8h|2022",
+      "name": "Hisense U8H (2022) - Android TV",
+      "manufacturer": "Hisense",
+      "model": "U8H",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 120000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "hisense-u8h-vp9-4k",
+          "title": "VP9 4K Performance",
+          "description": "VP9 4K content at high bitrates may stutter. HEVC recommended for 4K.",
+          "severity": "info",
+          "codecs": ["vp9"],
+          "workaround": "Use HEVC for 4K content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 267,
+      "votes_down": 18,
+      "verified": true,
+      "notes": "Mini-LED with Android TV. Best Hisense Android TV model. Full codec suite including DV."
+    },
+    {
+      "id": "hisense-u7h-2022",
+      "device_hash": "hisense|androidtv|u7h|2022",
+      "name": "Hisense U7H (2022) - Android TV",
+      "manufacturer": "Hisense",
+      "model": "U7H",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 198,
+      "votes_down": 24,
+      "verified": true,
+      "notes": "Mid-range Hisense with Android TV. Good codec support for the price."
+    },
+    {
+      "id": "hisense-a6h-2022",
+      "device_hash": "hisense|androidtv|a6h|2022",
+      "name": "Hisense A6H / A65H (2022) - Android TV",
+      "manufacturer": "Hisense",
+      "model": "A6H",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "hisense-a6h-dv",
+          "title": "No Dolby Vision Support",
+          "description": "Hisense A6H does not support Dolby Vision despite supporting HDR10.",
+          "severity": "info",
+          "codecs": ["hevc"],
+          "workaround": "Use HDR10 or convert DV content to HDR10",
+          "resolved": false
+        },
+        {
+          "id": "hisense-a6h-dts",
+          "title": "No DTS Passthrough",
+          "description": "Hisense A6H does not support DTS audio passthrough.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3/E-AC-3",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 156,
+      "votes_down": 32,
+      "verified": true,
+      "notes": "Budget Hisense Android TV. Good 4K support but no DV or DTS. Best for casual users."
+    },
+    {
+      "id": "hisense-roku-tv-6-series",
+      "device_hash": "hisense|roku|r6-series|2021",
+      "name": "Hisense 6-Series Roku TV (2021)",
+      "manufacturer": "Hisense",
+      "model": "6-Series Roku TV",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Roku OS 10.5"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "hisense-roku-mkv-hdr",
+          "title": "HDR Issues in MKV Containers",
+          "description": "HDR content in MKV containers may not play correctly on Hisense Roku TV.",
+          "severity": "warning",
+          "codecs": ["hevc"],
+          "containers": ["mkv"],
+          "workaround": "Remux HDR content to MP4 or use TS container",
+          "resolved": false
+        },
+        {
+          "id": "hisense-roku-dv",
+          "title": "No Dolby Vision Support",
+          "description": "Hisense Roku TV models do not support Dolby Vision.",
+          "severity": "warning",
+          "codecs": ["hevc"],
+          "workaround": "Convert DV content to HDR10",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 312,
+      "votes_down": 41,
+      "verified": true,
+      "notes": "Hisense 6-Series with Roku OS. Popular mid-range. No DV, no DTS, limited VP9/AV1."
+    },
+    {
+      "id": "hisense-vidaa-a7v",
+      "device_hash": "hisense|vidaa|a7v|2022",
+      "name": "Hisense A7V / U7V (2022) - Vidaa",
+      "manufacturer": "Hisense",
+      "model": "A7V",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Vidaa OS 6.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 50000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "hisense-vidaa-vp9",
+          "title": "No VP9 or AV1 Support",
+          "description": "Hisense Vidaa OS TVs have limited codec support. VP9 and AV1 are not supported.",
+          "severity": "warning",
+          "codecs": ["vp9", "av1"],
+          "workaround": "Use H.264 or HEVC encoded content",
+          "resolved": false
+        },
+        {
+          "id": "hisense-vidaa-dts",
+          "title": "No DTS Support",
+          "description": "Vidaa OS does not support DTS audio.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 78,
+      "votes_down": 22,
+      "verified": true,
+      "notes": "Budget Hisense with Vidaa OS. Very limited codec support. VP9, AV1, DTS all unsupported."
+    },
+    {
+      "id": "hisense-u9dg-2021",
+      "device_hash": "hisense|androidtv|u9dg|2021",
+      "name": "Hisense U9DG Dual Cell (2021) - Android TV",
+      "manufacturer": "Hisense",
+      "model": "U9DG",
+      "platform": "hisense_smart_tv",
+      "os_versions": ["Android TV 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 120000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 89,
+      "votes_down": 6,
+      "verified": true,
+      "notes": "Premium dual-cell LCD. Full codec suite including DV. Excellent HDR performance."
+    }
+  ]
+}

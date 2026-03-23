@@ -23,8 +23,12 @@ type CuratedDevice struct {
 	Manufacturer   string              `json:"manufacturer"`
 	Model          string              `json:"model"`
 	Platform       string              `json:"platform"`
+	DeviceClass    string              `json:"device_class"`    // "A", "B", "C", "D" - premium to budget
+	Year           int                 `json:"year"`             // Manufacturing year
+	SoC            string              `json:"soc"`              // System-on-Chip (e.g., "Exynos M7", "α9 Gen 6", "Amlogic S905X4")
+	SoCAliases     []string            `json:"soc_aliases"`     // Alternate SoC names for matching
 	OSVersions     []string            `json:"os_versions,omitempty"`
-	Capabilities   *DeviceCapabilities `json:"capabilities"`
+	Capabilities   *DeviceCapabilities  `json:"capabilities"`
 	RecommendedProfile string          `json:"recommended_profile,omitempty"`
 	KnownIssues    []KnownIssue        `json:"known_issues,omitempty"`
 	Source         string              `json:"source"` // "community", "official", "curated"
@@ -170,16 +174,27 @@ func (cd *CuratedDatabase) addDevice(device *CuratedDevice) error {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
 
-	// Check for existing device with same hash
-	if existing, ok := cd.devices[device.DeviceHash]; ok {
-		// Keep the one with higher vote count or verified status
-		if device.Verified || device.VotesUp > existing.VotesUp {
-			cd.devices[device.ID] = device
-			cd.updateIndexes(device)
+	// Check for existing device with same hash using the hashIndex
+	if existingIDs, ok := cd.hashIndex[device.DeviceHash]; ok && len(existingIDs) > 0 {
+		// Get the existing device (first one with matching hash)
+		existingID := existingIDs[0]
+		if existing, ok := cd.devices[existingID]; ok {
+			// Keep the one with higher vote count or verified status
+			if device.Verified || device.VotesUp > existing.VotesUp {
+				// Update the existing entry instead of adding a new one
+				device.ID = existing.ID // Preserve original ID
+				device.CreatedAt = existing.CreatedAt // Preserve creation time
+				device.VotesUp = existing.VotesUp // Preserve votes
+				device.VotesDown = existing.VotesDown
+				device.Verified = existing.Verified || device.Verified // Keep verified if set
+				cd.devices[existing.ID] = device
+				cd.updateIndexes(device)
+			}
+			return nil
 		}
-		return nil
 	}
 
+	// No existing device, add as new
 	cd.devices[device.ID] = device
 	cd.updateIndexes(device)
 
@@ -657,4 +672,367 @@ func (cd *CuratedDatabase) LoadFromEmbedded(deviceJSON []byte) error {
 
 	cd.stats.PlatformsCount = len(cd.platformIndex)
 	return nil
+}
+
+// =============================================================================
+// VENDOR BEHAVIOR RULES
+// Based on DEVICE_DATABASE.md Section 4
+// These rules encode platform-specific behavior that overrides capability detection
+// =============================================================================
+
+// VendorRule represents a vendor-specific behavior rule
+type VendorRule struct {
+	Condition   string   // Rule condition (e.g., "year >= 2022")
+	HasDTS      bool     `json:"has_dts,omitempty"`
+	NoDTS       bool     `json:"no_dts,omitempty"`
+	HasDolbyVision    bool     `json:"has_dolby_vision,omitempty"`
+	NoDolbyVision     bool     `json:"no_dolby_vision,omitempty"`
+	HasHDR10Plus      bool     `json:"has_hdr10_plus,omitempty"`
+	NoHDR10Plus       bool     `json:"no_hdr10_plus,omitempty"`
+	HasAV1           bool     `json:"has_av1,omitempty"`
+	HasTrueHD        bool     `json:"has_truehd,omitempty"`
+	HasSSA           bool     `json:"has_ssa,omitempty"`
+	HasTTML          bool     `json:"has_ttml,omitempty"`
+	HasWebM          bool     `json:"has_webm,omitempty"`
+	Workaround string   `json:"workaround,omitempty"`
+}
+
+// vendorRules encodes vendor-specific behavior based on DEVICE_DATABASE.md
+var vendorRules = map[string][]VendorRule{
+	"samsung": {
+		// Samsung NEVER supports DTS (rule from DEVICE_DATABASE.md)
+		{Condition: "always", NoDTS: true, Workaround: "Transcode DTS to AC-3 or E-AC-3"},
+		// Samsung NEVER supports Dolby Vision
+		{Condition: "always", NoDolbyVision: true, Workaround: "Use HDR10 or HDR10+ instead"},
+		// Samsung never adopted HDR10+ in early models, but 2022+ has it
+		{Condition: "year >= 2022", HasHDR10Plus: true},
+		// Samsung AV1 support starts 2022 (Neo QLED)
+		{Condition: "year >= 2022", HasAV1: true},
+		// Samsung supports SSA/ASS subtitles
+		{Condition: "always", HasSSA: true},
+		// Samsung supports TTML (but not WebM)
+		{Condition: "always", HasTTML: true},
+		{Condition: "always", NoHDR10Plus: false}, // Reset for older models
+	},
+	"lg": {
+		// LG ALWAYS supports Dolby Vision (rule from DEVICE_DATABASE.md)
+		{Condition: "always", HasDolbyVision: true},
+		// LG never adopted HDR10+
+		{Condition: "always", NoHDR10Plus: true, Workaround: "Use HDR10 or DV instead"},
+		// LG AV1 support starts 2022 (α7 Gen 5 / α9 Gen 5)
+		{Condition: "year >= 2022", HasAV1: true},
+		// LG supports SSA/ASS subtitles
+		{Condition: "always", HasSSA: true},
+		// LG supports TTML
+		{Condition: "always", HasTTML: true},
+	},
+	"roku": {
+		// Roku TV OS behavior (different from raw Roku)
+		{Condition: "always", NoDTS: false}, // Some Roku TV models support DTS via TV speakers
+		{Condition: "always", HasDolbyVision: false}, // No DV on Roku
+		// Roku TV models (TCL, Hisense, etc.) run Roku TV OS
+		// They support Dolby Vision on premium models (TCL 6-series)
+		{Condition: "model contains 'TCL' or model contains 'Roku TV'", HasDolbyVision: true},
+	},
+	"amazon": {
+		// Amazon Fire TV (rule from DEVICE_DATABASE.md)
+		{Condition: "always", NoDTS: true, Workaround: "Transcode DTS to AC-3 or E-AC-3"},
+		// Fire TV supports DV Profile 8
+		{Condition: "always", HasDolbyVision: true},
+		// Fire TV 3rd gen and later support AV1
+		{Condition: "year >= 2022", HasAV1: true},
+		// No SSA/ASS on Fire TV
+		{Condition: "always", NoHDR10Plus: true}, // Fire TV doesn't support HDR10+
+		// Fire TV subtitle formats
+		{Condition: "always", HasTTML: false},
+	},
+	"apple": {
+		// Apple TV (rule from DEVICE_DATABASE.md)
+		{Condition: "always", NoDTS: true, Workaround: "Apple doesn't support DTS passthrough"},
+		// Apple supports DV and HDR10
+		{Condition: "always", HasDolbyVision: true},
+		// Apple supports HDR10+ since tvOS 17
+		{Condition: "year >= 2024", HasHDR10Plus: true},
+		// Apple has full subtitle support
+		{Condition: "always", HasSSA: true, HasTTML: true},
+		// Apple supports WebM
+		{Condition: "always", HasWebM: true},
+	},
+	"sony": {
+		// Sony Android TV
+		{Condition: "always", HasDolbyVision: true},
+		// Sony AV1 support starts 2021
+		{Condition: "year >= 2021", HasAV1: true},
+		// Sony supports DTS
+		{Condition: "always", HasTrueHD: true},
+		{Condition: "always", HasSSA: true, HasTTML: true},
+	},
+	"nvidia": {
+		// NVIDIA Shield
+		{Condition: "always", HasDolbyVision: true},
+		{Condition: "always", HasAV1: true},
+		{Condition: "always", HasTrueHD: true, NoDTS: false}, // Shield supports DTS
+		{Condition: "always", HasSSA: true, HasTTML: true, HasWebM: true},
+	},
+	"xiaomi": {
+		// Xiaomi Mi Box
+		{Condition: "always", HasDolbyVision: true},
+		// Mi Box S (2018) has no AV1, later models may
+		{Condition: "year >= 2022", HasAV1: true},
+		// No TrueHD on Mi Box S
+		{Condition: "model contains 'Mi Box S'", HasTrueHD: false},
+		// SSA/ASS support varies
+		{Condition: "model contains 'Mi Box S'", HasSSA: false},
+	},
+	"philips": {
+		// Philips Android TV
+		{Condition: "always", HasDolbyVision: true},
+		{Condition: "year >= 2022", HasAV1: true},
+		// Saphi OS is different (limited codec support)
+		{Condition: "model contains 'Saphi'", HasDolbyVision: false},
+		{Condition: "model contains 'Saphi'", NoDTS: true},
+	},
+	"hisense": {
+		// Hisense varies by OS
+		// Android TV models support DV
+		{Condition: "model contains 'Android'", HasDolbyVision: true},
+		// Vidaa OS models have limited support
+		{Condition: "not model contains 'Android'", NoDolbyVision: true},
+		{Condition: "not model contains 'Android'", NoDTS: true},
+		{Condition: "year >= 2022", HasAV1: true},
+	},
+}
+
+// GetVendorRules returns the rules for a given vendor/manufacturer
+func GetVendorRules(manufacturer string) []VendorRule {
+	manufacturer = strings.ToLower(manufacturer)
+	if rules, ok := vendorRules[manufacturer]; ok {
+		return rules
+	}
+	return nil
+}
+
+// ApplyVendorRules applies vendor-specific rules to a device's capabilities
+func ApplyVendorRules(device *CuratedDevice) {
+	if device == nil || device.Capabilities == nil {
+		return
+	}
+
+	rules := GetVendorRules(device.Manufacturer)
+	if rules == nil {
+		return
+	}
+
+	// Infer year from model name if not set
+	year := device.Year
+	if year == 0 {
+		year = inferYearFromModel(device.Model)
+	}
+
+	caps := device.Capabilities
+
+	for _, rule := range rules {
+		// Check if rule condition matches
+		if !matchesRuleCondition(rule.Condition, device, year) {
+			continue
+		}
+
+		// Apply DTS rule
+		if rule.NoDTS {
+			caps.SupportsDTS = false
+			// Remove DTS from audio codecs
+			caps.AudioCodecs = removeString(caps.AudioCodecs, "dts")
+			caps.AudioCodecs = removeString(caps.AudioCodecs, "dtshd")
+		}
+		if rule.HasDTS && !rule.NoDTS {
+			caps.SupportsDTS = true
+			if !containsString(caps.AudioCodecs, "dts") {
+				caps.AudioCodecs = append(caps.AudioCodecs, "dts")
+			}
+		}
+
+		// Apply Dolby Vision rule
+		if rule.NoDolbyVision {
+			caps.SupportsDolbyVision = false
+		}
+		if rule.HasDolbyVision && !rule.NoDolbyVision {
+			caps.SupportsDolbyVision = true
+		}
+
+		// Apply HDR10+ rule (only if HDR is supported)
+		if rule.HasHDR10Plus && caps.SupportsHDR {
+			// HDR10+ is supported - ensure hdr10 is in HDR list
+			// Note: this is metadata, not a capability flag in current model
+		}
+		if rule.NoHDR10Plus {
+			// HDR10+ not supported - this doesn't affect HDR flag
+			// Just informational
+		}
+
+		// Apply AV1 rule
+		if rule.HasAV1 {
+			if !containsString(caps.VideoCodecs, "av1") {
+				caps.VideoCodecs = append(caps.VideoCodecs, "av1")
+			}
+		}
+
+		// Apply TrueHD rule
+		if rule.HasTrueHD {
+			if !containsString(caps.AudioCodecs, "truehd") {
+				caps.AudioCodecs = append(caps.AudioCodecs, "truehd")
+			}
+			if !containsString(caps.AudioCodecs, "flac") {
+				caps.AudioCodecs = append(caps.AudioCodecs, "flac")
+			}
+		}
+
+		// Apply SSA/ASS rule
+		if rule.HasSSA {
+			if !containsString(caps.SubtitleFormats, "ssa") {
+				caps.SubtitleFormats = append(caps.SubtitleFormats, "ssa")
+			}
+			if !containsString(caps.SubtitleFormats, "ass") {
+				caps.SubtitleFormats = append(caps.SubtitleFormats, "ass")
+			}
+		}
+
+		// Apply TTML rule
+		if rule.HasTTML {
+			if !containsString(caps.SubtitleFormats, "ttml") {
+				caps.SubtitleFormats = append(caps.SubtitleFormats, "ttml")
+			}
+		}
+
+		// Apply WebM rule
+		if rule.HasWebM {
+			if !containsString(caps.ContainerFormats, "webm") {
+				caps.ContainerFormats = append(caps.ContainerFormats, "webm")
+			}
+		}
+	}
+}
+
+// matchesRuleCondition checks if a rule condition matches the device
+func matchesRuleCondition(condition string, device *CuratedDevice, year int) bool {
+	switch {
+	case condition == "always":
+		return true
+	case strings.HasPrefix(condition, "year >= "):
+		requiredYear := 0
+		fmt.Sscanf(condition, "year >= %d", &requiredYear)
+		return year >= requiredYear
+	case strings.HasPrefix(condition, "not "):
+		// Negation - check if condition is false
+		inner := strings.TrimPrefix(condition, "not ")
+		return !matchesRuleCondition(inner, device, year)
+	case strings.Contains(condition, "model contains "):
+		modelPart := strings.TrimPrefix(condition, "model contains ")
+		modelPart = strings.Trim(modelPart, "'\"")
+		return strings.Contains(strings.ToLower(device.Model), strings.ToLower(modelPart))
+	default:
+		return false
+	}
+}
+
+// inferYearFromModel extracts year from model name (e.g., "QN90B" -> 2022)
+func inferYearFromModel(model string) int {
+	model = strings.ToLower(model)
+
+	// Samsung pattern: QN90B (2022), Q80T (2020)
+	samsungYears := map[string]int{
+		"qn90": 2022, "qn85": 2021, "qn80": 2022, "qn70": 2022,
+		"q90": 2019, "q80": 2020, "q70": 2019, "q60": 2020,
+		"ls03": 2022, "au80": 2021, "ru71": 2019, "tu80": 2020,
+	}
+
+	// LG pattern
+	lgYears := map[string]int{
+		"c2": 2022, "c1": 2021, "c3": 2023, "g2": 2022, "g1": 2021,
+		"a1": 2021, "b1": 2021, "a2": 2022, "u1": 2021,
+	}
+
+	// Sony pattern
+	sonyYears := map[string]int{
+		"a95k": 2022, "a90k": 2022, "a80k": 2022, "x95k": 2022,
+		"a9g": 2019, "z9g": 2019, "x900h": 2020, "x90j": 2021,
+		"a80j": 2021, "x90k": 2022,
+	}
+
+	for prefix, year := range samsungYears {
+		if strings.Contains(model, prefix) {
+			return year
+		}
+	}
+	for prefix, year := range lgYears {
+		if strings.Contains(model, prefix) {
+			return year
+		}
+	}
+	for prefix, year := range sonyYears {
+		if strings.Contains(model, prefix) {
+			return year
+		}
+	}
+
+	return 0
+}
+
+// Helper functions
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) []string {
+	result := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if v != s {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// GetVendorWorkaround returns a workaround for a vendor-specific limitation
+func GetVendorWorkaround(manufacturer, limitation string) string {
+	rules := GetVendorRules(manufacturer)
+	if rules == nil {
+		return ""
+	}
+
+	for _, rule := range rules {
+		switch {
+		case limitation == "dts" && rule.NoDTS:
+			return rule.Workaround
+		case limitation == "dolby_vision" && rule.NoDolbyVision:
+			return rule.Workaround
+		}
+	}
+	return ""
+}
+
+// GetKnownLimitations returns a list of known limitations for a manufacturer
+func GetKnownLimitations(manufacturer string) []string {
+	rules := GetVendorRules(manufacturer)
+	if rules == nil {
+		return nil
+	}
+
+	var limitations []string
+	for _, rule := range rules {
+		if rule.NoDTS {
+			limitations = append(limitations, "No DTS passthrough")
+		}
+		if rule.NoDolbyVision {
+			limitations = append(limitations, "No Dolby Vision support")
+		}
+		if rule.NoHDR10Plus {
+			limitations = append(limitations, "No HDR10+ support")
+		}
+	}
+	return limitations
 }

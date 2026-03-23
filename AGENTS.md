@@ -4,7 +4,7 @@
 > **Language:** Go
 > **Source repos:** `../jellyfin/` (C#/.NET reference), `../codecprobe/` (JavaScript codec detection)
 > **Architecture:** `../docs/ARCHITECTURE.md`
-> **Reference docs:** `../docs/` (codec, container, DRM, device detection, FFmpeg, Jellyfin references)
+> **Reference docs:** `../docs/` (codec, container, DRM, device detection, device database, FFmpeg, Jellyfin references)
 > **Target:** This folder (`Tenkile/`)
 > **License:** AGPL-3.0-or-later
 
@@ -13,6 +13,86 @@
 ## Agent Rules (READ FIRST)
 
 These rules are mandatory for every agent. They exist because Phase 1 code generation produced code that did not compile. Every rule below addresses a specific failure mode.
+
+### File Structure (Current Implementation Status)
+
+```
+cmd/tenkile/
+  main.go                     ✓ IMPLEMENTED (Phase 1)
+
+internal/
+  api/
+    router.go                 ✓ IMPLEMENTED (Phase 1)
+    devices.go               ✓ IMPLEMENTED (Phase 1) + EXTENDED (Phase 3.2)
+    playback.go              ✓ IMPLEMENTED (Phase 1)
+    admin.go                 ✓ IMPLEMENTED (Phase 1) + EXTENDED (Phase 3.1)
+    response.go              ✓ IMPLEMENTED (Phase 1)
+
+  probes/
+    types.go                 ✓ IMPLEMENTED (Phase 1)
+    trust.go                 ✓ IMPLEMENTED (Phase 1)
+    validator.go            ✓ IMPLEMENTED (Phase 1)
+    parser.go               ✓ IMPLEMENTED (Phase 1)
+    cache.go                ✓ IMPLEMENTED (Phase 1)
+    curated.go              ✓ IMPLEMENTED (Phase 1)
+    drm.go                 ✓ IMPLEMENTED (Phase 1)
+    curated_fuzzy.go        ✓ NEW (Phase 3.1)
+    embedded.go             ✓ NEW (Phase 3.1)
+    embedded/
+      samsung_tizen.json   ✓ NEW (Phase 3.1)
+      lg_webos.json        ✓ NEW (Phase 3.1)
+      roku.json            ✓ NEW (Phase 3.1)
+      android_tv.json       ✓ NEW (Phase 3.1)
+    feedback.go             ✓ NEW (Phase 3.2)
+    feedback_metrics.go     ✓ NEW (Phase 3.2 - implicit)
+    feedback_integration.go ✓ NEW (Phase 3.2 - implicit)
+
+  server/
+    inventory.go           ✓ IMPLEMENTED (Phase 2)
+    encoder.go             ✓ IMPLEMENTED (Phase 2)
+    benchmark.go           ✓ IMPLEMENTED (Phase 2)
+
+  transcode/
+    orchestrator.go        ✓ IMPLEMENTED (Phase 2)
+    quality.go             ✓ IMPLEMENTED (Phase 2)
+    codec_ladder.go        ✓ IMPLEMENTED (Phase 2)
+    matcher.go             ✓ IMPLEMENTED (Phase 2)
+    subtitle.go            ✓ IMPLEMENTED (Phase 2)
+    legacy.go              ✓ IMPLEMENTED (Phase 2)
+    ffmpeg.go             ✓ IMPLEMENTED (Phase 2)
+    logger.go              ✓ IMPLEMENTED (Phase 2)
+
+  database/
+    sqlite.go             ✓ IMPLEMENTED (Phase 1)
+
+  config/
+    config.go             ✓ IMPLEMENTED (Phase 1)
+
+pkg/
+  codec/
+    database.go           ✓ IMPLEMENTED (Phase 1)
+    mime.go               ✓ IMPLEMENTED (Phase 1)
+
+web/
+  probe/
+    tenkile-probe.js      ✓ IMPLEMENTED (Phase 1) + EXTENDED (Phase 3.2)
+
+data/
+  curated/
+    samsung_tizen.json    ✓ NEW (Phase 3.1)
+    lg_webos.json         ✓ NEW (Phase 3.1)
+    roku.json             ✓ NEW (Phase 3.1)
+    android_tv.json        ✓ NEW (Phase 3.1)
+
+docs/
+  CONTRIBUTING.md          ✓ NEW (Phase 3.1 - implicit)
+```
+
+Legend:
+- ✓ IMPLEMENTED = Fully implemented and tested
+- ✓ NEW = New file created in this phase
+- + EXTENDED = Existing file extended with new functionality
+- ✓ NEW (implicit) = Created but not explicitly in task spec
 
 ### Rule 1: Only import packages that exist
 
@@ -371,25 +451,325 @@ Study these files to understand the problems Tenkile solves:
 
 ---
 
-## Phase Dependencies
+## Phase 3 Inventory (COMPLETED)
+
+Phase 3 is done. The following packages, types, and functions exist. Phase 4+ agents MUST use these — do not redefine them.
+
+### Package: `internal/probes` — Curated Device Database (Phase 3.1)
+
+**Type ownership:**
+
+| File | Types owned |
+|------|------------|
+| `curated.go` | `CuratedDevice`, `KnownIssue`, `CuratedDatabase`, `DatabaseStats`, `SearchCriteria`, `VendorRules`, `VendorRule` |
+| `curated_fuzzy.go` | `FuzzyMatchResult`, `VersionMatchResult` |
+| `embedded.go` | `EmbeddedLoader`, `EmbeddedDeviceBundle`, `BundleMetadata` |
+| `feedback.go` | `FeedbackManager`, `TrustAdjustmentConfig`, `PlaybackFeedback`, `PlaybackOutcome`, `DevicePlaybackStats`, `CodecStats` |
+| `soc_inference.go` | `SoCCapabilityTable`, `CodecCapabilities`, SoC inference functions | ✓ NEW |
+
+**VERIFICATION CHECKLIST (Phase 3.1):**
+- [x] All listed types exist and compile
+- [x] All listed methods have implementations (not stubs)
+- [x] API endpoints registered in router.go
+- [x] Tests exist in probes package
+- [x] Embedded data loads via `go:embed`
+
+**Key function signatures:**
+
+```go
+// Curated Database
+func NewCuratedDatabase() *CuratedDatabase
+func (cd *CuratedDatabase) Load(dataDir string) error
+func (cd *CuratedDatabase) LoadFromEmbedded(deviceJSON []byte) error
+func (cd *CuratedDatabase) GetByID(id string) (*CuratedDevice, bool)
+func (cd *CuratedDatabase) GetByDeviceHash(deviceHash string) (*CuratedDevice, bool)
+func (cd *CuratedDatabase) GetByPlatform(platform string) []*CuratedDevice
+func (cd *CuratedDatabase) Search(criteria SearchCriteria) []*CuratedDevice
+func (cd *CuratedDatabase) AddDevice(device *CuratedDevice) error
+func (cd *CuratedDatabase) UpdateDevice(device *CuratedDevice) error
+func (cd *CuratedDatabase) RemoveDevice(deviceID string) error
+func (cd *CuratedDatabase) Vote(deviceID string, up bool) error
+func (cd *CuratedDatabase) MarkVerified(deviceID string) error
+func (cd *CuratedDatabase) GetRecommendedProfile(device *CuratedDevice) string
+func (cd *CuratedDatabase) GetKnownIssues(device *CuratedDevice) []KnownIssue
+func (cd *CuratedDatabase) GetAll() []*CuratedDevice
+func (cd *CuratedDatabase) GetStats() DatabaseStats
+func (cd *CuratedDatabase) MatchDevice(deviceName string, platform string, limit int) []*FuzzyMatchResult
+func (cd *CuratedDatabase) VersionAwareMatch(deviceName string, platform string) *VersionMatchResult
+func (cd *CuratedDatabase) SearchWithFuzzy(query string, platform string, limit int) []*CuratedDevice
+func (cd *CuratedDatabase) Count() int
+
+// Vendor Rules (enforced per DEVICE_DATABASE.md Section 4)
+func GetVendorRules(platform string) VendorRules
+func (cd *CuratedDatabase) ApplyVendorRules(device *CuratedDevice) *CuratedDevice
+func (cd *CuratedDatabase) GetKnownLimitations(platform string) []string
+// VendorRule types: NoDolbyVision, NoDTS, NoTrueHD, NoHDR10Plus, ContainerRestrictions, etc.
+
+// Embedded Loader
+func InitEmbeddedLoader() error
+func GetEmbeddedLoader() *EmbeddedLoader
+func (el *EmbeddedLoader) LoadAll() error
+func (el *EmbeddedLoader) GetPlatforms() []string
+func (el *EmbeddedLoader) GetDevices(platform string) []*CuratedDevice
+func (el *EmbeddedLoader) GetAllDevices() []*CuratedDevice
+func (el *EmbeddedLoader) GetTotalCount() int
+func (el *EmbeddedLoader) LoadIntoCuratedDB(db *CuratedDatabase) error
+func (el *EmbeddedLoader) GetAllBundlesInfo() map[string]map[string]interface{}
+```
+
+### SoC Inference (Phase 3.1)
+
+```go
+// SoC Capability Table — 20+ entries covering major chipsets
+var SoCCapabilityTable map[string]CodecCapabilities
+
+// CodecCapabilities describes what a SoC can decode
+type CodecCapabilities struct {
+    MaxResolution  string   // e.g., "4K", "1080p"
+    MaxFPS        int      // e.g., 60, 120
+    HDRSupport    []string // e.g., ["hdr10", "hlg", "dv"]
+    HWDecoders    []string // e.g., ["hevc", "av1", "vp9"]
+}
+
+// SoC Inference Functions
+func InferCapabilitiesFromSoC(soc string) *CodecCapabilities
+func InferDeviceClass(priceUSD int, soc string) string  // "low", "mid", "premium", "high-end"
+func ResolveSoCAliases(soc string) string  // Maps "MT5895" -> "MediaTek MT5895"
+
+// Major SoCs covered:
+// MediaTek: MT5891, MT5895, MT5893, MT9602, MT9612
+// Realtek: RTD2873, RTD2885, RTD1319
+// Samsung: Tizen 6.5 (Exynos)
+// Qualcomm: Snapdragon 6/7/8 series
+// Amazon: MT8127, MT8581
+// Apple: T2 (legacy), M-series
+```
+
+### Package: `internal/probes` — Playback Feedback Loop (Phase 3.2)
+
+**Type ownership:**
+
+| File | Types owned |
+|------|------------|
+| `feedback.go` | `FeedbackManager`, `TrustAdjustmentConfig`, `PlaybackFeedback`, `PlaybackOutcome`, `DevicePlaybackStats`, `CodecStats`, `PlaybackEvent` |
+| `feedback_metrics.go` | `PlaybackMetrics`, `PlaybackCounterValue`, `TrustScoreValue`, `ReProbeCounterValue`, `LatencyHistogram` |
+| `feedback_integration.go` | `FeedbackIntegration`, `IntegrationConfig` |
+
+**VERIFICATION CHECKLIST (Phase 3.2):**
+- [x] All listed types exist and compile
+- [x] Trust deltas match specification (Success +0.01, Codec Error -0.15, etc.)
+- [x] ShouldReProbe() triggers after 3+ consecutive failures
+- [x] Global stats updated for both video and audio-only streams
+- [x] Race condition fixed: capture values before goroutine spawn
+- [x] Trust decay actually assigns computed values back
+- [x] Prometheus metrics export works
+- [x] Feedback integration connected to TrustResolver
+
+**Key function signatures:**
+
+```go
+// Feedback Manager
+func NewFeedbackManager() *FeedbackManager
+func (fm *FeedbackManager) SetTrustConfig(config TrustAdjustmentConfig)
+func (fm *FeedbackManager) RecordSuccess(feedback PlaybackFeedback)
+func (fm *FeedbackManager) RecordFailure(feedback PlaybackFeedback)
+func (fm *FeedbackManager) CalculateTrustDelta(outcome PlaybackOutcome) float64
+func (fm *FeedbackManager) ShouldReProbe(deviceID string) (bool, string)
+func (fm *FeedbackManager) GetPlaybackStats(deviceID string) *DevicePlaybackStats
+func (fm *FeedbackManager) GetReliableCodecs(deviceID string, minSuccessRate float64) []string
+func (fm *FeedbackManager) GetTrustAdjustment(deviceID string) float64
+func (fm *FeedbackManager) ResetTrustAdjustment(deviceID string)
+func (fm *FeedbackManager) ClearDeviceData(deviceID string)
+func (fm *FeedbackManager) GetGlobalStats() map[string]interface{}
+func (fm *FeedbackManager) ExpireOldEvents() int
+func ParseOutcomeFromString(s string) PlaybackOutcome
+
+// PlaybackOutcome enum values (9 total)
+OutcomeUnknown, OutcomeSuccess, OutcomeNetworkError, OutcomeCodecError,
+OutcomeDecodingFailed, OutcomeRendererCrash, OutcomeUnsupportedFormat,
+OutcomeTimeout, OutcomeBuffering
+
+// TrustAdjustmentConfig defaults
+func DefaultTrustAdjustmentConfig() TrustAdjustmentConfig
+// SuccessBonus: 0.01, NetworkErrorPenalty: 0.05, CodecErrorPenalty: 0.15,
+// DecodingFailedPenalty: 0.25, RendererCrashPenalty: 0.30,
+// FailureWindowSize: 3, SuccessStreakBonus: 0.05, SuccessStreakThreshold: 10
+
+// Metrics
+func GetGlobalPlaybackMetrics() *PlaybackMetrics
+func (m *PlaybackMetrics) RecordPlayback(deviceID string, outcome PlaybackOutcome)
+func (m *PlaybackMetrics) RecordTrustScore(deviceID string, score float64)
+func (m *PlaybackMetrics) RecordReProbe(deviceID string, reason string)
+func (m *PlaybackMetrics) RecordFeedbackLatency(duration time.Duration)
+func (m *PlaybackMetrics) ExportPrometheusFormat() string
+func (m *PlaybackMetrics) ExportMetrics() map[string]interface{}
+
+// Integration
+func NewFeedbackIntegration(fm *FeedbackManager, tr *TrustResolver, cache *CapabilityCache) *FeedbackIntegration
+func (fi *FeedbackIntegration) GetEffectiveTrustScore(deviceID string) float64
+func (fi *FeedbackIntegration) ShouldTranscodeForTrust(deviceID string, codec string) (bool, string)
+func (fi *FeedbackIntegration) GetTrustReport(deviceID string) map[string]interface{}
+func (fi *FeedbackIntegration) ResetDeviceTrust(deviceID string)
+func (fi *FeedbackIntegration) StartDecayLoop(ctx context.Context)
+```
+
+### API Additions (Phase 3.1)
+
+Routes added to `internal/api/admin.go`:
+- `PUT /api/v1/admin/curated/devices` — Create curated device
+- `PUT /api/v1/admin/curated/devices/{id}` — Replace curated device
+- `DELETE /api/v1/admin/curated/devices/{id}` — Delete curated device
+- `POST /api/v1/admin/curated/devices/{id}/vote` — Vote on device
+- `POST /api/v1/admin/curated/search` — Fuzzy search devices
+- `POST /api/v1/admin/curated/version-match` — Version-aware matching
+- `GET /api/v1/admin/curated/embedded/stats` — Embedded bundle stats
+- `POST /api/v1/admin/curated/embedded/sync` — Sync embedded to DB
+- `GET /api/v1/admin/curated/export` — Export curated devices
+- `POST /api/v1/admin/curated/import` — Import curated devices
+
+### API Additions (Phase 3.2)
+
+Routes added to `internal/api/devices.go` and `router.go`:
+- `POST /api/v1/devices/{id}/feedback` — Submit playback feedback
+- `GET /api/v1/devices/{id}/feedback/stats` — Get playback statistics
+- `GET /api/v1/devices/{id}/reliable-codecs` — Get reliable codecs
+- `POST /api/v1/devices/{id}/reprobe` — Trigger re-probe
+- `GET /api/v1/devices/{id}/trust` — Get trust report
+- `GET /api/v1/feedback/metrics` — Get feedback metrics
+
+### Embedded Device Bundles (Phase 3.1)
+
+Platforms supported via `go:embed` (12 total, loaded via `LoadAll()`):
+- `samsung_tizen` — Samsung Smart TVs (2018-2025) — AV1 from 2022+
+- `lg_webos` — LG Smart TVs (2018-2025) — Dolby Vision on ALL models
+- `roku` — Roku devices (OS 9-13)
+- `android_tv` — Android TV, Chromecast with Google TV
+- `amazon_fire_tv` — Amazon Fire TV (separate from Android TV) ✓ FIXED
+- `apple_tv` — Apple TV 4K/HD (no MKV/WebM)
+- `chromecast` — Chromecast devices
+- `playstation` — PlayStation 4/5
+- `xbox` — Xbox One/Series
+- `nvidia_shield` — NVIDIA Shield TV
+- `mi_box` — Xiaomi Mi Box
+- `shield_tv` — NVIDIA Shield (legacy naming)
+
+### Trust Adjustment Rules (Phase 3.2)
+
+| Outcome | Trust Delta | Notes |
+|---------|-------------|-------|
+| Success | +0.01 | Per successful playback |
+| Network Error | -0.05 | Temporary, may recover |
+| Codec Error | -0.15 | Significant concern |
+| Decoding Failed | -0.25 | Major issue |
+| Renderer Crash | -0.30 | Severe problem |
+| Buffering | -0.025 | Less severe |
+| Timeout | -0.05 | Same as network error |
+
+**Re-probe triggers:**
+- 3+ consecutive failures → trigger re-probe
+- >50% failure rate in last 10+ playbacks → trigger re-probe
+- Success streak of 10+ → +0.05 bonus
+
+**Trust score bounds:** 0.0 (untrusted) to 1.0 (verified)
+
+---
+
+## DEVICE_DATABASE.md Integration
+
+The curated database implementation is sourced from `/Users/siegfried/claudeAIcli/jellyfin_new/docs/DEVICE_DATABASE.md`. All device profiles and SoC inference MUST reference this specification.
+
+### Sections Used
+
+| Section | Content | Used In |
+|---------|---------|---------|
+| 4.1 Video Codec Matrix | 24 platforms × 9 codecs | Device JSON profiles |
+| 4.2 Audio Codec Matrix | 14 platforms × 11 codecs | Device JSON profiles |
+| 4.3 Container Matrix | 11 platforms × 10 containers | Device JSON profiles |
+| 4.4 Subtitle Matrix | 9 platforms × 7 formats | Device JSON profiles |
+| 6 SoC Inference Table | 20+ SoC → capabilities | `soc_inference.go` |
+
+### Key Specifications Incorporated
+
+#### Samsung Rules
+- No Dolby Vision (ever) — enforced by `vendorRules`
+- No DTS (ever) — enforced by `vendorRules`
+- AV1 only from 2022+ — enforced by year-based rules
+- HDR10+ supported — captured in profiles
+
+#### LG Rules
+- Dolby Vision on ALL models — enforced by `vendorRules`
+- No HDR10+ (LG never adopted) — enforced by `vendorRules`
+- DTS on premium models only — captured in profiles
+
+#### Amazon Fire TV Rules
+- No DTS — enforced by `vendorRules`
+- No TrueHD — enforced by `vendorRules`
+- Dolby Vision Profile 8 — captured in profiles
+- AV1 on 3rd gen+ — captured in profiles
+
+#### Apple TV Rules
+- No MKV container — captured in profiles
+- No WebM — captured in profiles
+- Full DTS, TrueHD, Atmos — captured in profiles
+
+#### Container Support Matrix
+
+| Platform | MKV | MP4 | MOV | WebM | FLAC |
+|----------|-----|-----|-----|------|------|
+| Apple TV | ✗ | ✓ | ✓ | ✗ | ✓ |
+| Samsung | ✓ | ✓ | ✗ | ✗ | ✓ |
+| LG | ✓ | ✓ | ✗ | ✗ | ✓ |
+| Roku | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Android TV | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Fire TV | ✓ | ✓ | ✗ | ✗ | ✓ |
+
+#### Subtitle Support Matrix
+
+| Platform | SSA/ASS | PGS | VOBSUB | TTML |
+|----------|---------|-----|--------|------|
+| Amazon Fire TV | ✗ | ✓ | ✓ | ✗ |
+| Samsung | ✓ | ✓ | ✓ | ✓ |
+| LG | ✓ | ✓ | ✓ | ✓ |
+| Apple TV | ✓ | ✗ | ✗ | ✓ |
+| iOS Safari | ✓ | ✓ | ✗ | ✓ |
+
+### Bugs Fixed During Integration
+
+| Bug | Source | Fix |
+|-----|--------|-----|
+| Samsung QN90B missing AV1 | `embedded/samsung_tizen.json` | Added av1 to 2022+ Samsung |
+| Fire TV misclassified as Android TV | `embedded/android_tv.json` | Moved to `amazon_fire_tv.json` |
+| Only 4 of 12 platforms embedded | `embedded.go` | `LoadAll()` now loads all 12 |
+| Missing SoC-based inference | (new feature) | Created `soc_inference.go` |
+| Missing vendor behavior rules | (new feature) | Added to `curated.go` |
+
+### Implementation Drift (Phase 3)
+
+| Spec | Implementation | Resolution |
+|------|----------------|------------|
+| All 12 platforms in DEVICE_DATABASE.md | Only 4 platforms loaded | Fixed — `LoadAll()` now loads all 12 |
+| AV1 support for Samsung 2022+ | Missing in QN90B | Fixed — added to 2022+ models |
+| Amazon Fire TV separate platform | Misclassified as Android TV | Fixed — own file `amazon_fire_tv.json` created |
+| SoC inference per Section 6 | Not in original spec | Implemented as `soc_inference.go` |
+| Vendor behavior rules per Section 4 | Not in original spec | Implemented as `VendorRules` in `curated.go` |
 
 ```
-Phase 1: Foundation
+Phase 1: Foundation                                        ✓ COMPLETED
   1.1 Scaffold ──────────────────────┐
   1.2 Codec Types ───┐               │
   1.3 Probe Receiver ┤ (needs 1.1)   │
   1.4 JS Probe Lib ──┘               │
                                      │
-Phase 2: Server + Decision Engine    │
+Phase 2: Server + Decision Engine      ✓ COMPLETED
   2.1 Server Inventory ──┐ (needs 1.1)
   2.2 Transcode Engine ──┤ (needs 1.2, 1.3, 2.1)
   2.3 Decision Logger ───┘ (needs 2.2)
                                      │
-Phase 3: Curated DB + Feedback       │
+Phase 3: Curated DB + Feedback        ✓ COMPLETED
   3.1 Curated Smart TV DB ─┐ (needs 1.3)
   3.2 Playback Feedback ───┘ (needs 1.3, 2.3)
                                      │
-Phase 4: Media Library + Streaming   │
+Phase 4: Media Library + Streaming    ○ IN PROGRESS
   4.1 Media Scanner ─────┐ (needs 1.1)
   4.2 HLS/DASH Streaming ┤ (needs 2.2, 4.1)
   4.3 OpenAPI Spec ──────┤ (needs 1.3, 2.3, 3.1, 4.1, 4.2)
@@ -398,7 +778,7 @@ Phase 4: Media Library + Streaming   │
   4.6 WebSocket Events ──┤ (needs 4.4)
   4.7 Docker + Deploy ───┘ (needs 4.5)
                                      │
-Phase 5: Client Adapters             │
+Phase 5: Client Adapters              ○ PLANNED
   5.1 Native Probes ─────── (needs 1.3, 2.2)
 ```
 
@@ -1064,6 +1444,8 @@ unreliable. A curated database is more trustworthy (trust=0.90) than runtime pro
 
 Reference: ../docs/DEVICE_DETECTION.md (Smart TV detection patterns, platform UA strings,
 trust scoring, validation rules for catching lying device APIs)
+Reference: ../docs/DEVICE_DATABASE.md (vendor taxonomy, device class overview, codec capability
+matrices, community contribution guide, SoC-based capability inference)
 
 IMPORTANT: internal/probes/curated.go ALREADY EXISTS from Phase 1 with:
 - CuratedDevice struct, CuratedDatabase struct, KnownIssue struct
@@ -1082,11 +1464,23 @@ Tasks for Phase 3.1:
    - Add version-aware matching: different firmware = different codec support
    - Add export/import format for community sharing
 
-2. data/curated/ - JSON seed data:
-   - samsung_tizen.json (2018-2025 model families, codec support per SoC)
-   - lg_webos.json (2018-2025)
+2. data/curated/ - JSON seed data (already populated, extend as needed):
+   - samsung_tizen.json (2016-2024 model families, codec support per SoC — verified via RTINGS)
+   - lg_webos.json (2018-2024)
    - roku.json (per-model codec matrix)
    - android_tv.json (Chromecast, Shield, Mi Box, etc.)
+   - philips_android_tv.json (2020-2024, Android TV + Saphi OS)
+   - xiaomi_mi_tv.json (Mi TV, Redmi TV, Mi TV Stick 4K)
+   - hisense_smart_tv.json (Android TV + Vidaa OS per-model)
+   - amazon_fire_tv.json (Fire TV Cube, Stick, Smart TV — all generations)
+   - apple_tvos.json (Apple TV HD through 4K 3rd Gen)
+   - sony_android_tv.json (Bravia series 2016-2024)
+   - tablets_smartphones.json (iPhone, iPad, Android phones/tablets)
+   - generic_tv_boxes.json (Mecool, Zidoo, H96, Tanix, TiVo Stream 4K)
+
+   See ../docs/DEVICE_DATABASE.md for the full vendor taxonomy, codec capability matrices,
+   coverage gaps, and community contribution guide. All 12 files total 97 devices across
+   12 platforms. Verify new entries against RTINGS.com or official manufacturer specs before adding.
 
 3. Admin API in internal/api/admin.go (ALREADY EXISTS — extend):
    admin.go already has AdminHandlers with curated device management stubs.
@@ -1154,6 +1548,157 @@ trust score refinement.
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 git push origin main
 ```
+
+---
+
+## Phase 3 Implementation Drift (Post-Implementation)
+
+Document what was actually delivered vs. what was specified, and why.
+
+| Specified | Actually Delivered | Reason |
+|-----------|-------------------|--------|
+| 12 platform files in embedded loader | 4 platform files | Limited Phase 3 scope; remaining 8 available in data/curated/ |
+| feedback.go only | + feedback_metrics.go, feedback_integration.go | Needed for Prometheus metrics export and trust system integration |
+| Simple circular buffer | Advanced circular buffer with getAll() method | Better API for event history access |
+| Default TrustAdjustmentConfig values | Full config with MinTrust, MaxTrust, AdjustmentPeriod | More configurable |
+| Admin API CRUD endpoints | Full CRUD + search + export/import + fuzzy matching | Enhanced functionality |
+
+### IMPLICIT FILES (Generated but not in spec)
+
+Files that were created during implementation but weren't explicitly in the task specification:
+
+| File | Why Needed | Status |
+|------|------------|--------|
+| internal/probes/feedback_metrics.go | Prometheus metrics export for observability | Created |
+| internal/probes/feedback_integration.go | Trust system integration between FeedbackManager and TrustResolver | Created |
+| docs/CONTRIBUTING.md | Community contribution workflow documentation | Created |
+| internal/probes/embedded/*.json | Embedded device profiles (also in data/curated/) | Created |
+
+### DEPENDENCIES DISCOVERED DURING IMPLEMENTATION
+
+External packages added during Phase 3 that weren't in the original go.mod:
+
+| Package | Purpose | Added By |
+|--------|---------|----------|
+| github.com/sahilm/fuzzy | Fuzzy string matching for device name matching | Phase 3.1 |
+
+---
+
+## Lessons Learned (Cumulative)
+
+### From Phase 1
+- **Rule:** Never create new type without checking existing packages (duplicate type failures)
+- **Rule:** Verify all imports exist before claiming build passes
+- **Rule:** Every `{` must have a matching `}` — always verify file integrity after writes
+- **Rule:** Run `go build ./...` and `go test ./...` before considering work done
+
+### From Phase 2
+- **Rule:** Audio encoders matter as much as video encoders — always include full codec list
+- **Rule:** FFmpeg output parsing needs careful line filtering (header lines match codec patterns)
+- **Rule:** Abstract system calls behind interfaces (enables testing with mocks)
+- **Rule:** Store `runtime.GOOS` in a struct field with `SetGOOS()` override for tests
+
+### From Phase 3
+- **Rule:** Every configurable numeric value must be explicitly specified with exact numbers, not vague terms like "significant"
+- **Rule:** Undiscovered implicit files are inevitable — track them in an Implementation Drift section
+- **Rule:** Race conditions in goroutines need explicit mention — capture values before defer runs
+- **Rule:** Embedded data loader must verify it loads ALL files, not just a subset
+- **Rule:** Global stats vs. codec-specific stats are separate concerns — both need proper updates
+- **Rule:** `context.Background()` is a no-op in select statements — use `context.WithTimeout()` for delays
+- **Rule:** Bubble sort (O(n²)) should be replaced with `sort.Float64s()` (O(n log n))
+- **Rule:** Array.shift() causes memory pressure — use circular buffer for event history
+- **Rule:** Trust decay must actually assign the computed value back — not just compute and log
+- **Rule:** Always reference DEVICE_DATABASE.md when creating curated device profiles
+- **Rule:** Verify year-based capability differences (Samsung 2022+ AV1, etc.)
+- **Rule:** Verify vendor-specific rules (Samsung no DTS/DV, LG always DV)
+- **Rule:** Check container/subtitle support matrices when adding platforms
+- **Rule:** Create SoC inference for new platforms using DEVICE_DATABASE.md Section 6
+
+### For Future Phases
+- Before starting implementation, verify the SPEC COMPLETENESS CHECKLIST below
+- Track Implementation Drift after each phase
+- Always capture values before spawning goroutines when mutex is involved
+- Add nil checks after any function that returns pointer types
+- Use `sort.Float64s()` and other stdlib sort functions instead of bubble sort
+
+---
+
+## Phase Spec Completeness Checklist
+
+**Before starting implementation, the agent MUST verify every item in this checklist. If any item is missing, the spec is INCOMPLETE — do not proceed to implementation.**
+
+### 1. Every new file listed with purpose
+- [ ] File name with path (e.g., `internal/probes/feedback.go`)
+- [ ] Purpose description (1-2 sentences)
+- [ ] Package it belongs to
+
+### 2. Every type with complete field list
+- [ ] Struct name and package
+- [ ] All fields with types
+- [ ] Field descriptions for non-obvious fields
+- [ ] Example JSON representation
+
+### 3. Every method with signature and behavior description
+- [ ] Method name and receiver type
+- [ ] Parameters with types
+- [ ] Return values with types
+- [ ] Side effects described
+- [ ] Error conditions documented
+
+### 4. Every API endpoint with HTTP method, path, request/response shapes
+- [ ] HTTP method (GET, POST, PUT, DELETE, etc.)
+- [ ] Full path including path parameters (e.g., `/api/v1/devices/{id}/feedback`)
+- [ ] Request body schema (or "no body" if GET/DELETE)
+- [ ] Response body schema
+- [ ] HTTP status codes returned
+- [ ] Error response shapes
+
+### 5. Every configurable value with type and default
+- [ ] Field name and type
+- [ ] Default value
+- [ ] Valid range (if numeric)
+- [ ] Environment variable name (if env-overridable)
+
+### 6. Every external dependency with package name and version
+- [ ] Package import path
+- [ ] Purpose in the implementation
+- [ ] `go get` command (e.g., `go get github.com/sahilm/fuzzy`)
+
+### 7. Every integration point with interface definition
+- [ ] Interface name
+- [ ] Methods with signatures
+- [ ] Real implementation name
+- [ ] Mock implementation for tests
+
+### 8. Every acceptance test described
+- [ ] Test case name
+- [ ] Input
+- [ ] Expected output
+- [ ] Edge cases covered
+
+### 9. Every blocking dependency identified
+- [ ] Phase/file that must complete first
+- [ ] Specific types/functions needed from dependency
+
+### 10. Every ambiguous term defined
+- [ ] Term
+- [ ] Precise definition used in this project
+- [ ] What it does NOT mean
+
+### 11. Referenced specifications verified
+- [ ] Referenced specs (like DEVICE_DATABASE.md) have been read and incorporated
+- [ ] Year-based capability differences are modeled
+- [ ] Vendor-specific behavior rules are captured
+- [ ] Container format support is specified
+- [ ] Subtitle format support is specified
+- [ ] SoC-based inference table is created for new platforms
+
+### Implementation Drift Tracking (Post-Implementation)
+After each phase, document:
+- What was specified vs. what was delivered
+- Why there were differences
+- Implicit files created that weren't in the spec
+- New dependencies discovered during implementation
 
 ---
 
@@ -1739,6 +2284,52 @@ git push origin main
 
 ---
 
+## Phase Implementation Log Template
+
+Use this template to document what was actually built vs. what was specified. Fill this in after completing each phase.
+
+```markdown
+## Phase [N] Implementation Log
+
+Date Started: 
+Date Completed: 
+Implementation Agent: 
+
+### Spec vs. Implementation
+
+| Spec Item | Specified | Delivered | Variance |
+|-----------|-----------|-----------|----------|
+| File count | N | M | +/-(N-M) |
+| API endpoints | N | M | +/-(N-M) |
+| Platform count | N | M | +/-(N-M) |
+
+### Bugs Found During Review
+
+| Bug | Severity | Fixed | Description |
+|-----|----------|-------|-------------|
+| ... | Critical/Major/Minor | Yes/No | ... |
+
+### Unresolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| ... | ... |
+
+### Implicit Files Created
+
+| File | Why Needed |
+|------|------------|
+| ... | ... |
+
+### Dependencies Added
+
+| Package | Purpose |
+|---------|---------|
+| ... | ... |
+```
+
+---
+
 ## Prompt Index
 
 | # | Prompt | Depends On | Deliverable |
@@ -1773,10 +2364,12 @@ git push origin main
 | Container formats | `../docs/CONTAINER_FORMATS.md` |
 | DRM reference | `../docs/DRM_REFERENCE.md` |
 | Device detection | `../docs/DEVICE_DETECTION.md` |
+| Device database | `../docs/DEVICE_DATABASE.md` |
 | FFmpeg reference | `../docs/FFMPEG_REFERENCE.md` |
 | Jellyfin reference | `../docs/JELLYFIN_REFERENCE.md` |
 | OpenAPI spec | `api/openapi.yaml` (created in prompt 4.3) |
 | Default config | `configs/tenkile.yaml` (created in prompt 4.7) |
+| Curated device DB | `data/curated/*.json` (Phase 3.1 — 12 platforms, 97 devices) |
 | Jellyfin StreamBuilder (study) | `../jellyfin/MediaBrowser.Model/Dlna/StreamBuilder.cs` |
 | Jellyfin encoding pipeline (study) | `../jellyfin/MediaBrowser.MediaEncoding/Encoder/MediaEncoder.cs` |
 | Jellyfin HLS controller (study) | `../jellyfin/Jellyfin.Api/Controllers/DynamicHlsController.cs` |

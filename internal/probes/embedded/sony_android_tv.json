@@ -1,0 +1,208 @@
+{
+  "_metadata": {
+    "platform": "sony_android_tv",
+    "manufacturer": "Sony",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Sony Smart TV device profiles covering Android TV platform. All Sony TVs 2016-2025 use Android TV (except some 2022+ Bravia Core models which use a custom OS). Full codec support with X1/XR/XR-Processor picture quality."
+  },
+  "devices": [
+    {
+      "id": "sony-a95l-2023",
+      "device_hash": "sony|androidtv|a95l|2023",
+      "name": "Sony A95L (2023) - QD-OLED",
+      "manufacturer": "Sony",
+      "model": "A95L",
+      "platform": "sony_android_tv",
+      "os_versions": ["Android TV 11", "Google TV"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 150000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 234,
+      "votes_down": 5,
+      "verified": true,
+      "notes": "QD-OLED flagship with XR Cognitive Processor. Best Sony TV. Full codec suite."
+    },
+    {
+      "id": "sony-x90l-2023",
+      "device_hash": "sony|androidtv|x90l|2023",
+      "name": "Sony X90L (2023) - Full Array LED",
+      "manufacturer": "Sony",
+      "model": "X90L",
+      "platform": "sony_android_tv",
+      "os_versions": ["Android TV 11", "Google TV"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 120000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 178,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "XR Processor. Full codec support. Good value Sony with DV and full audio."
+    },
+    {
+      "id": "sony-x85k-2022",
+      "device_hash": "sony|androidtv|x85k|2022",
+      "name": "Sony X85K (2022)",
+      "manufacturer": "Sony",
+      "model": "X85K",
+      "platform": "sony_android_tv",
+      "os_versions": ["Android TV 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 123,
+      "votes_down": 15,
+      "verified": true,
+      "notes": "Entry-level 4K Sony Android TV. Full codec support."
+    },
+    {
+      "id": "sony-a90j-2021",
+      "device_hash": "sony|androidtv|a90j|2021",
+      "name": "Sony A90J (2021) - Master Series OLED",
+      "manufacturer": "Sony",
+      "model": "A90J",
+      "platform": "sony_android_tv",
+      "os_versions": ["Android TV 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 120000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 312,
+      "votes_down": 7,
+      "verified": true,
+      "notes": "Master Series OLED with XR Processor. Full codec suite."
+    },
+    {
+      "id": "sony-x900h-2020",
+      "device_hash": "sony|androidtv|x900h|2020",
+      "name": "Sony X900H / XH90 (2020)",
+      "manufacturer": "Sony",
+      "model": "X900H",
+      "platform": "sony_android_tv",
+      "os_versions": ["Android TV 9"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "sony-x900h-av1",
+          "title": "No AV1 Support",
+          "description": "Sony X900H does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 445,
+      "votes_down": 23,
+      "verified": true,
+      "notes": "Popular mid-range Sony. X1 Processor. No AV1. Excellent value."
+    }
+  ]
+}

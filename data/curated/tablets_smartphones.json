@@ -1,0 +1,329 @@
+{
+  "_metadata": {
+    "platform": "tablets_smartphones",
+    "manufacturer": "Various",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Mobile device profiles for iOS/iPadOS (Safari), Android (Chrome/in-app), and HarmonyOS. Capabilities are determined by hardware (SoC) and OS version, not device class. Includes iPhone, iPad, Android phones, and Android tablets."
+  },
+  "devices": [
+    {
+      "id": "apple-iphone-15-pro-max",
+      "device_hash": "apple|ios|iphone-15-pro-max|2023",
+      "name": "Apple iPhone 15 Pro Max (2023)",
+      "manufacturer": "Apple",
+      "model": "iPhone 15 Pro Max",
+      "platform": "tablets_smartphones",
+      "os_versions": ["iOS 17", "iOS 18"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ttml"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "fairplay": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "ios-safari-mkv",
+          "title": "Safari: No MKV/WebM Container Support",
+          "description": "iOS Safari does not support MKV or WebM containers. Use MP4/MOV.",
+          "severity": "warning",
+          "containers": ["mkv", "webm"],
+          "workaround": "Remux to MP4 or use in-app browsers that support more containers",
+          "resolved": false
+        },
+        {
+          "id": "ios-safari-av1",
+          "title": "Safari: No AV1 Hardware Decode",
+          "description": "iOS Safari does not support AV1 decoding. WebKit has no AV1 support yet.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K content on iOS Safari",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 445,
+      "votes_down": 12,
+      "verified": true,
+      "notes": "A17 Pro chip. Best iOS codec support. Dolby Vision Profile 8. Safari has container restrictions."
+    },
+    {
+      "id": "apple-ipad-pro-12-m4",
+      "device_hash": "apple|ios|ipad-pro-12-m4|2024",
+      "name": "Apple iPad Pro 12.9\" M4 (2024)",
+      "manufacturer": "Apple",
+      "model": "iPad Pro 12.9 M4",
+      "platform": "tablets_smartphones",
+      "os_versions": ["iPadOS 17", "iPadOS 18"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ttml"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "fairplay": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "ipad-safari-mkv",
+          "title": "Safari: No MKV/WebM Container Support",
+          "description": "iPadOS Safari does not support MKV or WebM containers.",
+          "severity": "warning",
+          "containers": ["mkv", "webm"],
+          "workaround": "Remux to MP4, or use Files app with compatible third-party apps",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 323,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "M4 chip. Best iPad for video. Large screen ideal for 4K HDR content."
+    },
+    {
+      "id": "samsung-galaxy-s24-ultra",
+      "device_hash": "samsung|android|galaxy-s24-ultra|2024",
+      "name": "Samsung Galaxy S24 Ultra (2024)",
+      "manufacturer": "Samsung",
+      "model": "Galaxy S24 Ultra",
+      "platform": "tablets_smartphones",
+      "os_versions": ["Android 14"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "mov", "webm"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "samsung-chrome-av1",
+          "title": "Chrome: AV1 Hardware Decode",
+          "description": "Galaxy S24 Ultra has AV1 hardware decode in Exynos variant but not in Snapdragon. Chrome browser support varies.",
+          "severity": "info",
+          "codecs": ["av1"],
+          "workaround": "Use Samsung Internet browser or in-app player for best codec support",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 389,
+      "votes_down": 15,
+      "verified": true,
+      "notes": "Snapdragon 8 Gen 3 / Exynos 2400. Full codec support. Best Android phone for media playback."
+    },
+    {
+      "id": "google-pixel-8-pro",
+      "device_hash": "google|android|pixel-8-pro|2023",
+      "name": "Google Pixel 8 Pro (2023)",
+      "manufacturer": "Google",
+      "model": "Pixel 8 Pro",
+      "platform": "tablets_smartphones",
+      "os_versions": ["Android 14"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "mov", "webm"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 278,
+      "votes_down": 18,
+      "verified": true,
+      "notes": "Google Tensor G3. Full codec suite. Good for pure Android experience."
+    },
+    {
+      "id": "samsung-galaxy-tab-s9-ultra",
+      "device_hash": "samsung|android|galaxy-tab-s9-ultra|2023",
+      "name": "Samsung Galaxy Tab S9 Ultra (2023)",
+      "manufacturer": "Samsung",
+      "model": "Galaxy Tab S9 Ultra",
+      "platform": "tablets_smartphones",
+      "os_versions": ["Android 13"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "mov", "webm"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 234,
+      "votes_down": 9,
+      "verified": true,
+      "notes": "Snapdragon 8 Gen 2. Full codec support. 14.6\" AMOLED display ideal for 4K HDR."
+    },
+    {
+      "id": "apple-iphone-se-2022",
+      "device_hash": "apple|ios|iphone-se-2022|2022",
+      "name": "Apple iPhone SE (3rd Gen) (2022)",
+      "manufacturer": "Apple",
+      "model": "iPhone SE (3rd Gen)",
+      "platform": "tablets_smartphones",
+      "os_versions": ["iOS 16", "iOS 17", "iOS 18"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ttml"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 50000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "fairplay": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "ios-se-no-vp9",
+          "title": "No VP9 or AV1 Support",
+          "description": "iPhone SE does not support VP9 or AV1 decoding in Safari.",
+          "severity": "warning",
+          "codecs": ["vp9", "av1"],
+          "workaround": "Use HEVC for 4K content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 156,
+      "votes_down": 23,
+      "verified": true,
+      "notes": "A15 Bionic. Budget iPhone. Limited video codecs (no VP9/AV1 in Safari). Good HEVC support."
+    },
+    {
+      "id": "xiaomi-redmi-note-12-pro",
+      "device_hash": "xiaomi|android|redmi-note-12-pro|2023",
+      "name": "Xiaomi Redmi Note 12 Pro (2023)",
+      "manufacturer": "Xiaomi",
+      "model": "Redmi Note 12 Pro",
+      "platform": "tablets_smartphones",
+      "os_versions": ["Android 13", "MIUI 14"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 50000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "xiaomi-redmi-av1",
+          "title": "No AV1 Support",
+          "description": "Redmi Note 12 Pro uses MediaTek Dimensity 1080 which does not support AV1 hardware decode.",
+          "severity": "info",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 178,
+      "votes_down": 34,
+      "verified": true,
+      "notes": "Budget-mid range. Good HEVC/HDR support. No AV1. Typical of Snapdragon 7xx / Dimensity mid-range phones."
+    }
+  ]
+}

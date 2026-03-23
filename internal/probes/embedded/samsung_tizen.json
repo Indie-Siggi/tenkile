@@ -1,0 +1,509 @@
+{
+  "_metadata": {
+    "platform": "samsung_tizen",
+    "manufacturer": "Samsung",
+    "version": "1.0.0",
+    "last_updated": "2024-03-15",
+    "source": "official",
+    "description": "Samsung Smart TV (Tizen OS) device profiles with accurate codec support"
+  },
+  "devices": [
+    {
+      "id": "samsung-qn90b-2022",
+      "device_hash": "samsung|tizen|qn90b|2022",
+      "name": "Samsung QN90B (2022)",
+      "manufacturer": "Samsung",
+      "model": "QN90B",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 7.0", "Tizen 7.5"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 125000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "samsung-dts-passthrough",
+          "title": "No DTS Audio Passthrough",
+          "description": "Samsung Tizen TVs do not support DTS or DTS-HD audio passthrough. Audio will be decoded and sent as PCM or transcoded to AC3.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Enable audio transcoding to AC3/EAC3 in Jellyfin server settings",
+          "resolved": false
+        },
+        {
+          "id": "samsung-mkv-h264-hdr",
+          "title": "MKV Container with H.264 HDR Issues",
+          "description": "Some Samsung models have issues playing H.264 HDR content in MKV containers. HEVC in MP4 usually works better.",
+          "severity": "info",
+          "codecs": ["h264"],
+          "containers": ["mkv"],
+          "workaround": "Use HEVC codec or MP4 container for HDR content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 245,
+      "votes_down": 12,
+      "verified": true,
+      "notes": "Flagship Neo QLED 4K TV. Excellent HEVC decoding. No Dolby Vision support."
+    },
+    {
+      "id": "samsung-q80t-2020",
+      "device_hash": "samsung|tizen|q80t|2020",
+      "name": "Samsung Q80T (2020)",
+      "manufacturer": "Samsung",
+      "model": "Q80T",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 5.5", "Tizen 6.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "samsung-q80t-dts",
+          "title": "No DTS Audio Passthrough",
+          "description": "DTS and DTS-HD are not supported for passthrough on Q80T.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Enable AC3/EAC3 transcoding in Jellyfin",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 189,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "Premium QLED 4K TV. Good overall codec support except DTS."
+    },
+    {
+      "id": "samsung-q60t-2020",
+      "device_hash": "samsung|tizen|q60t|2020",
+      "name": "Samsung Q60T (2020)",
+      "manufacturer": "Samsung",
+      "model": "Q60T",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 5.5"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "source": "official",
+      "votes_up": 134,
+      "votes_down": 15,
+      "verified": true,
+      "notes": "Entry-level QLED. No VP9 support, no 10-bit HEVC."
+    },
+    {
+      "id": "samsung-tu8000-2020",
+      "device_hash": "samsung|tizen|tu8000|2020",
+      "name": "Samsung TU8000 (2020)",
+      "manufacturer": "Samsung",
+      "model": "TU8000",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 5.5"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd",
+      "source": "official",
+      "votes_up": 98,
+      "votes_down": 22,
+      "verified": true,
+      "notes": "Budget 4K TV. Limited HDR performance. No Dolby Atmos."
+    },
+    {
+      "id": "samsung-qn85a-2021",
+      "device_hash": "samsung|tizen|qn85a|2021",
+      "name": "Samsung QN85A (2021)",
+      "manufacturer": "Samsung",
+      "model": "QN85A",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 6.0", "Tizen 6.5"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 125000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "source": "official",
+      "votes_up": 167,
+      "votes_down": 5,
+      "verified": true,
+      "notes": "Neo QLED with IPS panel. Same codec support as QN90B but wider viewing angle."
+    },
+    {
+      "id": "samsung-qa65q80c-2023",
+      "device_hash": "samsung|tizen|q80c|2023",
+      "name": "Samsung Q80C (2023)",
+      "manufacturer": "Samsung",
+      "model": "Q80C",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 8.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 125000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "samsung-q80c-av1-slow",
+          "title": "AV1 Decoding Performance",
+          "description": "AV1 decoding may have stuttering on some content due to software decoding limitations.",
+          "severity": "info",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K HDR content when possible",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 89,
+      "votes_down": 3,
+      "verified": true,
+      "notes": "2023 QLED with improved processing. Added AV1 support."
+    },
+    {
+      "id": "samsung-ls03b-2022",
+      "device_hash": "samsung|tizen|ls03b|2022",
+      "name": "Samsung The Frame LS03B (2022)",
+      "manufacturer": "Samsung",
+      "model": "LS03B",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 7.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "source": "official",
+      "votes_up": 76,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "Art TV. Same codec support as Q80T."
+    },
+    {
+      "id": "samsung-ru7100-2019",
+      "device_hash": "samsung|tizen|ru7100|2019",
+      "name": "Samsung RU7100 (2019)",
+      "manufacturer": "Samsung",
+      "model": "RU7100",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 5.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 40000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "full_hd",
+      "known_issues": [
+        {
+          "id": "samsung-ru7100-hdr-limited",
+          "title": "Limited HDR Performance",
+          "description": "HDR support is limited due to lack of local dimming and low peak brightness.",
+          "severity": "info",
+          "workaround": "Consider SDR profiles for better playback",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 156,
+      "votes_down": 34,
+      "verified": true,
+      "notes": "Budget 4K TV. HDR is largely decorative. Low bitrate limits."
+    },
+    {
+      "id": "samsung-q70r-2019",
+      "device_hash": "samsung|tizen|q70r|2019",
+      "name": "Samsung Q70R (2019)",
+      "manufacturer": "Samsung",
+      "model": "Q70R",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 4.5", "Tizen 5.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "source": "official",
+      "votes_up": 203,
+      "votes_down": 11,
+      "verified": true,
+      "notes": "Premium QLED 2019. Excellent value. Same codec limitations as newer models."
+    },
+    {
+      "id": "samsung-qn900c-2023",
+      "device_hash": "samsung|tizen|qn900c|2023",
+      "name": "Samsung QN900C 8K (2023)",
+      "manufacturer": "Samsung",
+      "model": "QN900C",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 8.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 7680,
+        "max_height": 4320,
+        "max_bitrate": 200000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "8k_uhd",
+      "known_issues": [
+        {
+          "id": "samsung-8k-mkv-hdr",
+          "title": "8K MKV HDR Playback",
+          "description": "Some 8K HDR content in MKV containers may not play correctly.",
+          "severity": "warning",
+          "codecs": ["hevc"],
+          "containers": ["mkv"],
+          "workaround": "Use MP4 container for 8K content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 45,
+      "votes_down": 2,
+      "verified": true,
+      "notes": "8K QLED flagship. Best-in-class processing. No DV despite premium price."
+    },
+    {
+      "id": "samsung-au8000-2021",
+      "device_hash": "samsung|tizen|au8000|2021",
+      "name": "Samsung AU8000 (2021)",
+      "manufacturer": "Samsung",
+      "model": "AU8000",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 6.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "ultra_hd",
+      "source": "official",
+      "votes_up": 112,
+      "votes_down": 18,
+      "verified": true,
+      "notes": "Crystal UHD. Entry-level 4K without quantum dots. No 10-bit."
+    },
+    {
+      "id": "samsung-neo-qled-2024-generic",
+      "device_hash": "samsung|tizen|neo-qled|2024",
+      "name": "Samsung Neo QLED (2024)",
+      "manufacturer": "Samsung",
+      "model": "Neo QLED 2024",
+      "platform": "samsung_tizen",
+      "os_versions": ["Tizen 8.0", "Tizen 9.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml", "webvtt"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "webm"],
+        "max_width": 7680,
+        "max_height": 4320,
+        "max_bitrate": 200000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true
+        }
+      },
+      "recommended_profile": "8k_uhd",
+      "source": "official",
+      "votes_up": 23,
+      "votes_down": 1,
+      "verified": false,
+      "notes": "Generic profile for 2024 Neo QLED models (QN90D, QN95D, etc.). Specific models may vary."
+    }
+  ]
+}

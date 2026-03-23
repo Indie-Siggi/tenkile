@@ -5,6 +5,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -546,4 +547,636 @@ func (h *AdminHandlers) handleHealthCheck(w http.ResponseWriter, r *http.Request
 	}
 
 	RespondJSON(w, status, resp)
+}
+
+// --- Phase 3.1: Extended Curated Device Management API ---
+
+// CreateCuratedDeviceRequest represents a request to create a new curated device
+type CreateCuratedDeviceRequest struct {
+	ID                 string                       `json:"id,omitempty"`
+	DeviceHash         string                       `json:"device_hash,omitempty"`
+	Name               string                       `json:"name"`
+	Manufacturer       string                       `json:"manufacturer"`
+	Model              string                       `json:"model"`
+	Platform           string                       `json:"platform"`
+	OSVersions         []string                     `json:"os_versions,omitempty"`
+	Capabilities       *probes.DeviceCapabilities    `json:"capabilities"`
+	RecommendedProfile string                       `json:"recommended_profile,omitempty"`
+	KnownIssues        []probes.KnownIssue          `json:"known_issues,omitempty"`
+	Source             string                       `json:"source,omitempty"`
+	Notes              string                       `json:"notes,omitempty"`
+}
+
+// FuzzyMatchRequest represents a fuzzy search request
+type FuzzyMatchRequest struct {
+	DeviceName string `json:"device_name"`
+	Platform   string `json:"platform,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+}
+
+// FuzzyMatchResponse represents a fuzzy search response
+type FuzzyMatchResponse struct {
+	Query      string                      `json:"query"`
+	Results    []*probes.FuzzyMatchResult  `json:"results"`
+	TotalFound int                         `json:"total_found"`
+}
+
+// VersionMatchResponse represents version-aware matching response
+type VersionMatchResponse struct {
+	Original   string                    `json:"original"`
+	BestMatch  *probes.CuratedDevice     `json:"best_match,omitempty"`
+	Confidence string                    `json:"confidence"`
+	BaseModel  string                    `json:"base_model,omitempty"`
+	Year       string                    `json:"year,omitempty"`
+	Variant    string                    `json:"variant,omitempty"`
+}
+
+// EmbeddedBundleInfo represents embedded data bundle information
+type EmbeddedBundleInfo struct {
+	Platform      string `json:"platform"`
+	Manufacturer  string `json:"manufacturer"`
+	Version       string `json:"version"`
+	LastUpdated   string `json:"last_updated"`
+	Source        string `json:"source"`
+	DeviceCount   int    `json:"device_count"`
+	VerifiedCount int    `json:"verified_count"`
+}
+
+// EmbeddedStatsResponse represents embedded data statistics
+type EmbeddedStatsResponse struct {
+	Version        string                    `json:"version"`
+	TotalDevices   int                       `json:"total_devices"`
+	Platforms      []string                  `json:"platforms"`
+	LoadedAt       string                    `json:"loaded_at"`
+	PlatformsInfo  map[string]EmbeddedBundleInfo `json:"platforms_info"`
+}
+
+// handleCreateCuratedDevice handles creating a new curated device (PUT /api/v1/admin/curated/devices)
+func (h *AdminHandlers) handleCreateCuratedDevice(w http.ResponseWriter, r *http.Request) {
+	var req CreateCuratedDeviceRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Failed to parse request body",
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" || req.Manufacturer == "" || req.Model == "" || req.Platform == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_required_fields",
+			Message: "name, manufacturer, model, and platform are required",
+		})
+		return
+	}
+
+	// Validate capabilities if provided
+	if req.Capabilities != nil {
+		validation := h.validator.ValidateCapabilities(req.Capabilities)
+		if !validation.IsValid {
+			RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_capabilities",
+				Message: "Capabilities validation failed",
+				Details: validation.Errors,
+			})
+			return
+		}
+	}
+
+	// Create device
+	device := &probes.CuratedDevice{
+		ID:                 req.ID,
+		DeviceHash:         req.DeviceHash,
+		Name:               req.Name,
+		Manufacturer:       req.Manufacturer,
+		Model:              req.Model,
+		Platform:           req.Platform,
+		OSVersions:         req.OSVersions,
+		Capabilities:       req.Capabilities,
+		RecommendedProfile: req.RecommendedProfile,
+		KnownIssues:        req.KnownIssues,
+		Source:             req.Source,
+		Notes:              req.Notes,
+		Verified:           false,
+		CreatedAt:          time.Now().UTC(),
+		LastUpdated:        time.Now().UTC(),
+	}
+
+	// Set source default if not provided
+	if device.Source == "" {
+		device.Source = "community"
+	}
+
+	// Add to database
+	if err := h.curatedDB.AddDevice(device); err != nil {
+		RespondJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error:   "create_failed",
+			Message: "Failed to create device: " + err.Error(),
+		})
+		return
+	}
+
+	RespondJSON(w, http.StatusCreated, map[string]interface{}{
+		"success":  true,
+		"device_id": device.ID,
+		"message":   "Device created successfully",
+		"device":    device,
+	})
+}
+
+// handlePutCuratedDevice handles full device replacement (PUT /api/v1/admin/curated/devices/{id})
+func (h *AdminHandlers) handlePutCuratedDevice(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+
+	if deviceID == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_device_id",
+			Message: "Device ID is required",
+		})
+		return
+	}
+
+	var req CreateCuratedDeviceRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Failed to parse request body",
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" || req.Manufacturer == "" || req.Model == "" || req.Platform == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_required_fields",
+			Message: "name, manufacturer, model, and platform are required",
+		})
+		return
+	}
+
+	// Get existing device to preserve some fields
+	existing, found := h.curatedDB.GetByID(deviceID)
+	if !found {
+		RespondJSON(w, http.StatusNotFound, ErrorResponse{
+			Error:   "device_not_found",
+			Message: "Device not found",
+		})
+		return
+	}
+
+	// Update device (full replacement)
+	device := &probes.CuratedDevice{
+		ID:                 deviceID,
+		DeviceHash:         req.DeviceHash,
+		Name:               req.Name,
+		Manufacturer:       req.Manufacturer,
+		Model:              req.Model,
+		Platform:           req.Platform,
+		OSVersions:         req.OSVersions,
+		Capabilities:       req.Capabilities,
+		RecommendedProfile: req.RecommendedProfile,
+		KnownIssues:        req.KnownIssues,
+		Source:             req.Source,
+		Notes:              req.Notes,
+		Verified:           existing.Verified, // Preserve verification status
+		CreatedAt:          existing.CreatedAt, // Preserve creation time
+		LastUpdated:        time.Now().UTC(),
+		VotesUp:            existing.VotesUp,   // Preserve votes
+		VotesDown:          existing.VotesDown,
+	}
+
+	// Validate capabilities if provided
+	if device.Capabilities != nil {
+		validation := h.validator.ValidateCapabilities(device.Capabilities)
+		if !validation.IsValid {
+			RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_capabilities",
+				Message: "Capabilities validation failed",
+				Details: validation.Errors,
+			})
+			return
+		}
+	}
+
+	// Save updated device
+	if err := h.curatedDB.UpdateDevice(device); err != nil {
+		RespondJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error:   "update_failed",
+			Message: "Failed to update device",
+		})
+		return
+	}
+
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":  true,
+		"device_id": deviceID,
+		"message":   "Device replaced successfully",
+		"device":    device,
+	})
+}
+
+// handleDeleteCuratedDevice handles device deletion (DELETE /api/v1/admin/curated/devices/{id})
+func (h *AdminHandlers) handleDeleteCuratedDevice(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+
+	if deviceID == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_device_id",
+			Message: "Device ID is required",
+		})
+		return
+	}
+
+	// Check if device exists
+	device, found := h.curatedDB.GetByID(deviceID)
+	if !found {
+		RespondJSON(w, http.StatusNotFound, ErrorResponse{
+			Error:   "device_not_found",
+			Message: "Device not found",
+		})
+		return
+	}
+
+	// Prevent deletion of official/verified devices (optional protection)
+	if device.Verified && device.Source == "official" {
+		RespondJSON(w, http.StatusForbidden, ErrorResponse{
+			Error:   "protected_device",
+			Message: "Cannot delete verified official devices. Unverify first.",
+		})
+		return
+	}
+
+	// Remove device
+	if err := h.curatedDB.RemoveDevice(deviceID); err != nil {
+		RespondJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error:   "delete_failed",
+			Message: "Failed to remove device",
+		})
+		return
+	}
+
+	// Also remove from cache
+	h.cache.Delete(deviceID)
+
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":  true,
+		"device_id": deviceID,
+		"message":   "Device deleted successfully",
+	})
+}
+
+// handleVoteCuratedDevice handles voting on a device (POST /api/v1/admin/curated/devices/{id}/vote)
+func (h *AdminHandlers) handleVoteCuratedDevice(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+
+	if deviceID == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_device_id",
+			Message: "Device ID is required",
+		})
+		return
+	}
+
+	var req struct {
+		Up bool `json:"up"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Default to upvote
+		req.Up = true
+	}
+
+	// Vote on device
+	if err := h.curatedDB.Vote(deviceID, req.Up); err != nil {
+		RespondJSON(w, http.StatusInternalServerError, ErrorResponse{
+			Error:   "vote_failed",
+			Message: "Failed to vote on device",
+		})
+		return
+	}
+
+	// Get updated device
+	device, _ := h.curatedDB.GetByID(deviceID)
+
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":   true,
+		"device_id": deviceID,
+		"message":   "Vote recorded",
+		"votes_up":  device.VotesUp,
+		"votes_down": device.VotesDown,
+	})
+}
+
+// handleFuzzySearchCuratedDevices handles fuzzy search (POST /api/v1/admin/curated/search)
+func (h *AdminHandlers) handleFuzzySearchCuratedDevices(w http.ResponseWriter, r *http.Request) {
+	var req FuzzyMatchRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Failed to parse request body",
+		})
+		return
+	}
+
+	if req.DeviceName == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_device_name",
+			Message: "device_name is required",
+		})
+		return
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	results := h.curatedDB.MatchDevice(req.DeviceName, req.Platform, limit)
+
+	RespondJSON(w, http.StatusOK, FuzzyMatchResponse{
+		Query:      req.DeviceName,
+		Results:    results,
+		TotalFound: len(results),
+	})
+}
+
+// handleVersionMatch handles version-aware device matching (POST /api/v1/admin/curated/version-match)
+func (h *AdminHandlers) handleVersionMatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceName string `json:"device_name"`
+		Platform   string `json:"platform,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Failed to parse request body",
+		})
+		return
+	}
+
+	if req.DeviceName == "" {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "missing_device_name",
+			Message: "device_name is required",
+		})
+		return
+	}
+
+	result := h.curatedDB.VersionAwareMatch(req.DeviceName, req.Platform)
+
+	RespondJSON(w, http.StatusOK, VersionMatchResponse{
+		Original:   result.Original,
+		BestMatch:  result.BestMatch,
+		Confidence: result.Confidence,
+		BaseModel:  result.BaseModel,
+		Year:       result.Year,
+		Variant:    result.Variant,
+	})
+}
+
+// handleGetEmbeddedStats handles getting embedded data statistics
+func (h *AdminHandlers) handleGetEmbeddedStats(w http.ResponseWriter, r *http.Request) {
+	loader := probes.GetEmbeddedLoader()
+
+	platforms := loader.GetPlatforms()
+	bundlesInfo := loader.GetAllBundlesInfo()
+
+	var totalDevices int
+	for _, info := range bundlesInfo {
+		if count, ok := info["device_count"].(int); ok {
+			totalDevices += count
+		}
+	}
+
+	resp := EmbeddedStatsResponse{
+		Version:       loader.GetVersion(),
+		TotalDevices:  totalDevices,
+		Platforms:     platforms,
+		LoadedAt:      loader.GetLoadTime().Format(time.RFC3339),
+		PlatformsInfo: make(map[string]EmbeddedBundleInfo),
+	}
+
+	for platform, info := range bundlesInfo {
+		bundleInfo := EmbeddedBundleInfo{
+			DeviceCount: info["device_count"].(int),
+		}
+		if v, ok := info["manufacturer"].(string); ok {
+			bundleInfo.Manufacturer = v
+		}
+		if v, ok := info["version"].(string); ok {
+			bundleInfo.Version = v
+		}
+		if v, ok := info["last_updated"].(string); ok {
+			bundleInfo.LastUpdated = v
+		}
+		if v, ok := info["source"].(string); ok {
+			bundleInfo.Source = v
+		}
+		if v, ok := info["verified_count"].(int); ok {
+			bundleInfo.VerifiedCount = v
+		}
+		resp.PlatformsInfo[platform] = bundleInfo
+	}
+
+	RespondJSON(w, http.StatusOK, resp)
+}
+
+// handleSyncEmbeddedToCuratedDB handles syncing embedded devices to curated DB
+func (h *AdminHandlers) handleSyncEmbeddedToCuratedDB(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Platform   string `json:"platform,omitempty"`
+		Overwrite  bool   `json:"overwrite,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Use defaults
+		req.Overwrite = false
+	}
+
+	loader := probes.GetEmbeddedLoader()
+	var synced int
+	var errors []string
+
+	if req.Platform != "" {
+		// Sync specific platform
+		devices := loader.GetDevices(req.Platform)
+		if devices == nil {
+			RespondJSON(w, http.StatusNotFound, ErrorResponse{
+				Error:   "platform_not_found",
+				Message: "Platform not found in embedded data",
+			})
+			return
+		}
+
+		for _, device := range devices {
+			if err := h.curatedDB.AddDevice(device); err != nil {
+				errors = append(errors, device.ID+": "+err.Error())
+			} else {
+				synced++
+			}
+		}
+	} else {
+		// Sync all platforms
+		if err := loader.LoadIntoCuratedDB(h.curatedDB); err != nil {
+			RespondJSON(w, http.StatusInternalServerError, ErrorResponse{
+				Error:   "sync_failed",
+				Message: "Failed to sync embedded devices: " + err.Error(),
+			})
+			return
+		}
+		synced = loader.GetTotalCount()
+	}
+
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"devices_synced": synced,
+		"errors":         errors,
+		"platform":       req.Platform,
+		"message":        fmt.Sprintf("Synced %d devices", synced),
+	})
+}
+
+// handleExportCuratedDevices handles exporting curated devices
+func (h *AdminHandlers) handleExportCuratedDevices(w http.ResponseWriter, r *http.Request) {
+	platform := r.URL.Query().Get("platform")
+	format := r.URL.Query().Get("format")
+
+	if format == "" {
+		format = "json"
+	}
+
+	var devices []*probes.CuratedDevice
+	if platform != "" {
+		devices = h.curatedDB.GetByPlatform(platform)
+	} else {
+		devices = h.curatedDB.GetAll()
+	}
+
+	if format == "json" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=curated-devices-%s.json", platform))
+
+		export := map[string]interface{}{
+			"_metadata": map[string]string{
+				"exported_at": time.Now().UTC().Format(time.RFC3339),
+				"platform":   platform,
+				"count":      fmt.Sprintf("%d", len(devices)),
+			},
+			"devices": devices,
+		}
+
+		RespondJSON(w, http.StatusOK, export)
+		return
+	}
+
+	RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+		Error:   "unsupported_format",
+		Message: "Only JSON format is supported",
+	})
+}
+
+// Import request structures
+type importRequest struct {
+	Devices       []*probes.CuratedDevice `json:"devices"`
+	MergeStrategy string                  `json:"merge_strategy,omitempty"` // "skip", "overwrite", "upsert"
+}
+
+// handleImportCuratedDevices handles importing curated devices
+func (h *AdminHandlers) handleImportCuratedDevices(w http.ResponseWriter, r *http.Request) {
+	var req importRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Failed to parse request body",
+		})
+		return
+	}
+
+	if len(req.Devices) == 0 {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "no_devices",
+			Message: "No devices to import",
+		})
+		return
+	}
+
+	mergeStrategy := req.MergeStrategy
+	if mergeStrategy == "" {
+		mergeStrategy = "upsert"
+	}
+
+	var imported, skipped, errors int
+	var errorDetails []string
+
+	for _, device := range req.Devices {
+		// Validate device
+		if device.Name == "" || device.Manufacturer == "" || device.Model == "" || device.Platform == "" {
+			errors++
+			errorDetails = append(errorDetails, "validation: missing required fields")
+			continue
+		}
+
+		// Check for existing device
+		existing, found := h.curatedDB.GetByID(device.ID)
+
+		switch mergeStrategy {
+		case "skip":
+			if found {
+				skipped++
+				continue
+			}
+		case "overwrite":
+			if found {
+				device.ID = existing.ID
+				device.CreatedAt = existing.CreatedAt
+				device.LastUpdated = time.Now().UTC()
+				device.VotesUp = existing.VotesUp
+				device.VotesDown = existing.VotesDown
+			}
+		case "upsert":
+			if found {
+				// Only update if new data is more recent or has higher votes
+				if device.VotesUp <= existing.VotesUp && !device.Verified {
+					skipped++
+					continue
+				}
+				device.ID = existing.ID
+				device.CreatedAt = existing.CreatedAt
+				device.LastUpdated = time.Now().UTC()
+				device.VotesUp = existing.VotesUp
+				device.VotesDown = existing.VotesDown
+			}
+		}
+
+		// Set timestamps if not set
+		if device.CreatedAt.IsZero() {
+			device.CreatedAt = time.Now().UTC()
+		}
+		if device.LastUpdated.IsZero() {
+			device.LastUpdated = time.Now().UTC()
+		}
+
+		if err := h.curatedDB.AddDevice(device); err != nil {
+			errors++
+			errorDetails = append(errorDetails, device.ID+": "+err.Error())
+		} else {
+			imported++
+		}
+	}
+
+	RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":      true,
+		"imported":     imported,
+		"skipped":      skipped,
+		"errors":       errors,
+		"error_details": errorDetails,
+		"total":        len(req.Devices),
+		"message":      fmt.Sprintf("Imported %d, skipped %d, errors %d", imported, skipped, errors),
+	})
 }

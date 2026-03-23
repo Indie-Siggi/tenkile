@@ -1,6 +1,26 @@
 # Tenkile
 
+[![Phase](https://img.shields.io/badge/Phase-3%20Complete-brightgreen)](AGENTS.md)
+[![AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
+
 A modern, self-hosted media server with intelligent device probing, adaptive transcoding, and curated device support.
+
+## What's New in Phase 3
+
+Phase 3 introduces **Curated Device Database** and **Playback Feedback Loop** for improved trust-based capability resolution.
+
+### Phase 3.1: Curated Smart TV Database
+- **Pre-configured device profiles** for Samsung Tizen, LG WebOS, Roku, and Android TV
+- **Fuzzy matching** to identify devices from user agent strings
+- **Version-aware matching** for firmware-specific capabilities
+- **Embedded device bundles** compiled into the binary for zero-config setup
+- **Community voting** on device profile accuracy
+
+### Phase 3.2: Playback Feedback Loop
+- **Automatic trust adjustment** based on playback success/failure
+- **Re-probe triggers** when devices consistently fail playback
+- **Per-codec reliability tracking** to identify problematic codecs
+- **Global playback metrics** with Prometheus export support
 
 ## Features
 
@@ -83,6 +103,47 @@ tenkile/
 ## API Documentation
 
 OpenAPI specification is available at `/api/v1/openapi.yaml` or view the generated docs at `/api/v1/docs`.
+
+### Curated Device Management (Phase 3.1)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/admin/curated/devices` | PUT | Create curated device |
+| `/api/v1/admin/curated/devices/{id}` | PUT | Replace curated device |
+| `/api/v1/admin/curated/devices/{id}` | DELETE | Delete curated device |
+| `/api/v1/admin/curated/devices/{id}/vote` | POST | Vote on device accuracy |
+| `/api/v1/admin/curated/search` | POST | Fuzzy search devices |
+| `/api/v1/admin/curated/version-match` | POST | Version-aware matching |
+| `/api/v1/admin/curated/embedded/stats` | GET | Embedded bundle statistics |
+| `/api/v1/admin/curated/embedded/sync` | POST | Sync embedded to curated DB |
+| `/api/v1/admin/curated/export` | GET | Export devices (JSON) |
+| `/api/v1/admin/curated/import` | POST | Import devices (JSON) |
+
+### Playback Feedback Loop (Phase 3.2)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/devices/{id}/feedback` | POST | Submit playback feedback |
+| `/api/v1/devices/{id}/feedback/stats` | GET | Get playback statistics |
+| `/api/v1/devices/{id}/reliable-codecs` | GET | Get reliable codecs for device |
+| `/api/v1/devices/{id}/reprobe` | POST | Trigger re-probe |
+| `/api/v1/devices/{id}/trust` | GET | Get trust report |
+| `/api/v1/feedback/metrics` | GET | Get feedback metrics |
+
+### Trust Adjustment (Phase 3.2)
+
+Playback outcomes automatically adjust device trust scores:
+
+| Outcome | Trust Delta | Severity |
+|---------|-------------|----------|
+| `success` | +0.01 | — |
+| `codec_error` | -0.15 | Significant |
+| `decoding_failed` | -0.25 | Major |
+| `renderer_crash` | -0.30 | Severe |
+| `network_error` | -0.05 | Minor |
+| `buffering` | -0.025 | Minor |
+
+Re-probe triggers: 3+ consecutive failures or >50% failure rate in last 10+ playbacks.
 
 ## License
 

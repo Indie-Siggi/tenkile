@@ -1,0 +1,309 @@
+{
+  "_metadata": {
+    "platform": "amazon_fire_tv",
+    "manufacturer": "Amazon",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Amazon Fire TV device profiles covering all Fire TV models (Stick, Cube, smart TVs). Based on Fire OS (forked Android). SoC varies: MediaTek MT8163/MT7921, Amlogic T965x."
+  },
+  "devices": [
+    {
+      "id": "amazon-fire-tv-cube-3rd",
+      "device_hash": "amazon|fireos|fire-tv-cube-3rd|2023",
+      "name": "Amazon Fire TV Cube (3rd Gen) (2023)",
+      "manufacturer": "Amazon",
+      "model": "Fire TV Cube (3rd Gen)",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 7"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "amazon-cube-dts",
+          "title": "No DTS or DTS-HD Passthrough",
+          "description": "Amazon Fire TV Cube does not support DTS audio passthrough.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3 or E-AC-3 for passthrough, or decode to PCM",
+          "resolved": false
+        },
+        {
+          "id": "amazon-cube-truehd",
+          "title": "TrueHD Requires E-AC-3 Core",
+          "description": "TrueHD passthrough requires the E-AC-3 core track. Pure TrueHD (without E-AC-3) may fail.",
+          "severity": "info",
+          "codecs": ["truehd"],
+          "workaround": "Ensure TrueHD tracks include E-AC-3 core, or transcode to E-AC-3",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 445,
+      "votes_down": 12,
+      "verified": true,
+      "notes": "Best Fire TV device. Full codec support except DTS. Wi-Fi 6E, Ethernet, voice commands."
+    },
+    {
+      "id": "amazon-fire-tv-4k-max",
+      "device_hash": "amazon|fireos|fire-tv-4k-max|2021",
+      "name": "Amazon Fire TV Stick 4K Max (2021)",
+      "manufacturer": "Amazon",
+      "model": "Fire TV Stick 4K Max",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 6"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "amazon-4k-max-mkv-hdr",
+          "title": "MKV Container HDR Performance",
+          "description": "High bitrate MKV files with HDR may stutter. MP4 recommended for 4K HDR content.",
+          "severity": "warning",
+          "codecs": ["hevc", "av1"],
+          "containers": ["mkv"],
+          "workaround": "Remux to MP4 for best 4K HDR performance",
+          "resolved": false
+        },
+        {
+          "id": "amazon-4k-max-dts",
+          "title": "No DTS Support",
+          "description": "Fire TV Stick 4K Max does not support DTS audio passthrough.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3 or E-AC-3",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 678,
+      "votes_down": 34,
+      "verified": true,
+      "notes": "Most popular Fire TV. AV1 support, Wi-Fi 6. No DTS. Great value for 4K HDR."
+    },
+    {
+      "id": "amazon-fire-tv-4k",
+      "device_hash": "amazon|fireos|fire-tv-4k|2017",
+      "name": "Amazon Fire TV Stick 4K (2017)",
+      "manufacturer": "Amazon",
+      "model": "Fire TV Stick 4K",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 6"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "amazon-4k-av1",
+          "title": "No AV1 Support",
+          "description": "Original Fire TV Stick 4K does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC or H.264 encoded content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 534,
+      "votes_down": 67,
+      "verified": true,
+      "notes": "Original 4K Fire TV Stick. Still good but no AV1 support. No TrueHD/FLAC."
+    },
+    {
+      "id": "amazon-fire-tv-stick-lite",
+      "device_hash": "amazon|fireos|fire-tv-stick-lite|2020",
+      "name": "Amazon Fire TV Stick Lite (2020)",
+      "manufacturer": "Amazon",
+      "model": "Fire TV Stick Lite",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 6"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 1920,
+        "max_height": 1080,
+        "max_bitrate": 30000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": false,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "full_hd_hdr",
+      "known_issues": [
+        {
+          "id": "amazon-lite-1080p",
+          "title": "Only 1080p Resolution",
+          "description": "Fire TV Stick Lite only supports up to 1080p. 4K content will be transcoded.",
+          "severity": "error",
+          "codecs": ["h264", "hevc", "vp9", "av1"],
+          "workaround": "Transcode 4K content to 1080p or use a 4K-capable device",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 389,
+      "votes_down": 56,
+      "verified": true,
+      "notes": "Budget Fire TV. 1080p only. Good for basic streaming but limited for high-quality media."
+    },
+    {
+      "id": "amazon-fire-tv-cube-2nd",
+      "device_hash": "amazon|fireos|fire-tv-cube-2nd|2020",
+      "name": "Amazon Fire TV Cube (2nd Gen) (2020)",
+      "manufacturer": "Amazon",
+      "model": "Fire TV Cube (2nd Gen)",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 7"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 312,
+      "votes_down": 15,
+      "verified": true,
+      "notes": "2nd gen Cube. Full codec support except DTS. Better than 4K Stick for media server use."
+    },
+    {
+      "id": "amazon-fire-tv-4k-tv",
+      "device_hash": "amazon|fireos|fire-tv-4k-tv|2021",
+      "name": "Amazon Fire TV 4K (2021) - Smart TV",
+      "manufacturer": "Amazon",
+      "model": "Fire TV 4K",
+      "platform": "amazon_fire_tv",
+      "os_versions": ["Fire OS 7"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "amazon-tv-mkv",
+          "title": "MKV Container Issues",
+          "description": "MKV containers with complex HEVC HDR content may have playback issues.",
+          "severity": "warning",
+          "codecs": ["hevc"],
+          "containers": ["mkv"],
+          "workaround": "Use MP4 container for 4K HDR content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 234,
+      "votes_down": 28,
+      "verified": true,
+      "notes": "Amazon 4K Smart TV. Same codec support as Fire TV Stick 4K Max. Built-in Alexa."
+    }
+  ]
+}

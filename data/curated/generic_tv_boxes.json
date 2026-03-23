@@ -1,0 +1,321 @@
+{
+  "_metadata": {
+    "platform": "generic_tv_boxes",
+    "manufacturer": "Various",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "community_curated",
+    "description": "Generic and enthusiast Android TV box profiles. Covers Mecool, H96, Tanix, Zidoo, Rockchip-based boxes, and generic Amlogic S905/S905X boxes. Capabilities vary widely by SoC. Use with caution — verify per-model."
+  },
+  "devices": [
+    {
+      "id": "mecool-km2-plus",
+      "device_hash": "mecool|androidtv|km2-plus|2022",
+      "name": "Mecool KM2 Plus (2022)",
+      "manufacturer": "Mecool",
+      "model": "KM2 Plus",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "mecool-km2-wifi",
+          "title": "Wi-Fi Performance",
+          "description": "Some units have limited Wi-Fi performance. Ethernet recommended for high-bitrate 4K.",
+          "severity": "info",
+          "workaround": "Use wired Ethernet for 4K HDR playback",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 145,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "Amlogic S928X SoC. Google Certified Android TV. Full codec support including AV1. Popular among enthusiasts."
+    },
+    {
+      "id": "mecool-km9-pro",
+      "device_hash": "mecool|androidtv|km9-pro|2020",
+      "name": "Mecool KM9 Pro (2020)",
+      "manufacturer": "Mecool",
+      "model": "KM9 Pro",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android TV 9"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3", "dts"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "mecool-km9-av1",
+          "title": "No AV1 Support",
+          "description": "Mecool KM9 Pro does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K content",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 98,
+      "votes_down": 12,
+      "verified": true,
+      "notes": "Amlogic S905X4 SoC. Google Certified. Good mid-range box. No AV1."
+    },
+    {
+      "id": "zidoo-z9x",
+      "device_hash": "zidoo|androidtv|z9x|2020",
+      "name": "Zidoo Z9X (2020)",
+      "manufacturer": "Zidoo",
+      "model": "Z9X",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android 9", "OpenWRT"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "iso"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 200000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "zidoo-z9x-updates",
+          "title": "Limited Software Updates",
+          "description": "Zidoo may not provide regular Android security updates.",
+          "severity": "info",
+          "workaround": "Use a VPN and be cautious with third-party app installations",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 234,
+      "votes_down": 6,
+      "verified": true,
+      "notes": "Realtek RTD1619DR SoC. Enthusiast-focused. Excellent for Blu-ray ISO/folder playback. Full codec support. High bitrate support (200Mbps+)."
+    },
+    {
+      "id": "h96-max-x3-generic",
+      "device_hash": "generic|androidtv|h96-max-x3|2021",
+      "name": "H96 Max X3 (2021) - Generic",
+      "manufacturer": "Generic / Various",
+      "model": "H96 Max X3",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": false,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "generic-av1",
+          "title": "No AV1 Support",
+          "description": "Generic boxes with S905X4 usually lack AV1 decode or have poor AV1 performance.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC or H.264 encoded content",
+          "resolved": false
+        },
+        {
+          "id": "generic-widevine",
+          "title": "No Widevine L1",
+          "description": "Many generic boxes lack Widevine L1 DRM, limiting streaming service quality.",
+          "severity": "warning",
+          "workaround": "Use Kodi or local playback for best experience",
+          "resolved": false
+        },
+        {
+          "id": "generic-soc-variations",
+          "title": "SoC Variations",
+          "description": "H96 Max X3 may ship with different SoCs (S905X3, S905X4, RK3318). Capabilities vary significantly.",
+          "severity": "warning",
+          "workaround": "Verify exact SoC model before purchasing or setting expectations",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 67,
+      "votes_down": 45,
+      "verified": false,
+      "notes": "Generic budget box. Not Google Certified. Widevine L3 only. Variable SoC. Buy with caution."
+    },
+    {
+      "id": "tanix-tx8max",
+      "device_hash": "tanix|androidtv|tx8max|2018",
+      "name": "Tanix TX8 MAX (2018)",
+      "manufacturer": "Tanix",
+      "model": "TX8 MAX",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android 7.1"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": false,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "tanix-android-7",
+          "title": "Old Android Version",
+          "description": "Runs Android 7.1 with no upgrade path. Security and compatibility concerns.",
+          "severity": "warning",
+          "workaround": "Consider a newer device with regular Android updates",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 89,
+      "votes_down": 34,
+      "verified": false,
+      "notes": "Amlogic S912 SoC. Older enthusiast box. Still functional for local playback but outdated."
+    },
+    {
+      "id": "tiVo-stream-4k",
+      "device_hash": "tivo|androidtv|tiVo-stream-4k|2020",
+      "name": "TiVo Stream 4K (2020)",
+      "manufacturer": "TiVo",
+      "model": "Stream 4K",
+      "platform": "generic_tv_boxes",
+      "os_versions": ["Android TV 9"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "tivo-dts",
+          "title": "No DTS Passthrough",
+          "description": "TiVo Stream 4K does not support DTS audio passthrough.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3 or E-AC-3",
+          "resolved": false
+        },
+        {
+          "id": "tivo-ethernet",
+          "title": "No Ethernet Port",
+          "description": "Wi-Fi only. No wired Ethernet option for high-bitrate 4K.",
+          "severity": "info",
+          "workaround": "Ensure strong Wi-Fi connection for 4K HDR playback",
+          "resolved": false
+        }
+      ],
+      "source": "community",
+      "votes_up": 178,
+      "votes_down": 22,
+      "verified": true,
+      "notes": "Amlogic S905X4 SoC. Google Certified. Good value but no DTS. Wi-Fi only."
+    }
+  ]
+}

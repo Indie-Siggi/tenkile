@@ -1,0 +1,323 @@
+{
+  "_metadata": {
+    "platform": "philips_android_tv",
+    "manufacturer": "Philips / TP Vision",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Philips Smart TV (Android TV / Saphi OS) device profiles with accurate codec support. TP Vision manufactures Philips TVs for Europe and select markets."
+  },
+  "devices": [
+    {
+      "id": "philips-oled-937",
+      "device_hash": "philips|androidtv|oled-937|2022",
+      "name": "Philips OLED 937 (2022)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "OLED 937",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 11", "Saphi OS 6.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 150000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "philips-dts-delay",
+          "title": "DTS Audio Sync Delay",
+          "description": "Some Philips models have audio sync issues with DTS passthrough, particularly with older receivers. Audio may be slightly out of sync.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Use AC-3 or E-AC-3 passthrough instead, or enable audio decoding to PCM",
+          "resolved": false
+        },
+        {
+          "id": "philips-saphi-mkv-hdr",
+          "title": "HDR Playback Issues in MKV on Saphi OS",
+          "description": "Some Philips TVs running Saphi OS have issues playing HDR content in MKV containers. Android TV models generally handle this better.",
+          "severity": "info",
+          "codecs": ["hevc"],
+          "containers": ["mkv"],
+          "workaround": "Use MP4 or TS containers for HDR content, or use Android TV models",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 87,
+      "votes_down": 5,
+      "verified": true,
+      "notes": "Premium OLED with Bowers & Wilkins soundbar. Full codec suite including Dolby Vision and DTS:X."
+    },
+    {
+      "id": "philips-oled-807",
+      "device_hash": "philips|androidtv|oled-807|2022",
+      "name": "Philips OLED 807 (2022)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "OLED 807",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 140000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 134,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "Step-down OLED from 937. Same codec support with P5 AI processor."
+    },
+    {
+      "id": "philips-miniled-9636",
+      "device_hash": "philips|androidtv|miniled-9636|2022",
+      "name": "Philips MiniLED 9636 (2022)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "MiniLED 9636",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 130000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 45,
+      "votes_down": 3,
+      "verified": true,
+      "notes": "MiniLED backlight with full array local dimming. Excellent HDR performance."
+    },
+    {
+      "id": "philips-pxs9505",
+      "device_hash": "philips|androidtv|pxs9505|2021",
+      "name": "Philips PUS9505 / PXS9505 (2021)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "PUS9505",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 120000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 62,
+      "votes_down": 4,
+      "verified": true,
+      "notes": "High-end 4K LCD with Android TV. P5 picture processor."
+    },
+    {
+      "id": "philips-pus8506",
+      "device_hash": "philips|androidtv|pus8506|2021",
+      "name": "Philips PUS8506 / The One (2021)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "PUS8506",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 10"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "philips-pus8506-av1",
+          "title": "AV1 Performance Issues",
+          "description": "Some users report stuttering when playing high-bitrate AV1 content on this model.",
+          "severity": "info",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC for 4K content when AV1 stutters",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 203,
+      "votes_down": 18,
+      "verified": true,
+      "notes": "Mid-range 'The One' series. Excellent value with full codec support."
+    },
+    {
+      "id": "philips-pus7906",
+      "device_hash": "philips|androidtv|pus7906|2020",
+      "name": "Philips PUS7906 (2020)",
+      "manufacturer": "Philips / TP Vision",
+      "model": "PUS7906",
+      "platform": "philips_android_tv",
+      "os_versions": ["Android TV 9"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 156,
+      "votes_down": 12,
+      "verified": true,
+      "notes": "Entry-level 4K Android TV from Philips. Good codec support for the price."
+    },
+    {
+      "id": "philips-pus6805",
+      "device_hash": "philips|saphi|pus6805|2019",
+      "name": "Philips PUS6805 (2019) - Saphi OS",
+      "manufacturer": "Philips / TP Vision",
+      "model": "PUS6805",
+      "platform": "philips_android_tv",
+      "os_versions": ["Saphi OS 5.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 60000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": false,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "philips-saphi-dts",
+          "title": "No DTS Support on Saphi OS",
+          "description": "Philips TVs running Saphi OS do not support DTS or DTS-HD audio passthrough.",
+          "severity": "warning",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS audio to AC-3 or E-AC-3",
+          "resolved": false
+        },
+        {
+          "id": "philips-saphi-av1",
+          "title": "No AV1 Support on Saphi OS",
+          "description": "Saphi OS does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC or H.264 versions of content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 89,
+      "votes_down": 15,
+      "verified": true,
+      "notes": "Budget Philips TV running Saphi OS. Limited codec support compared to Android TV models."
+    }
+  ]
+}

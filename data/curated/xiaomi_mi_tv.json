@@ -1,0 +1,298 @@
+{
+  "_metadata": {
+    "platform": "xiaomi_mi_tv",
+    "manufacturer": "Xiaomi / Redmi",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Xiaomi Mi TV, Redmi TV, and Xiaomi TV Stick device profiles. Based on Android TV OS with PatchWall launcher. SoC varies by model (Amlogic S905, S922, MediaTek)."
+  },
+  "devices": [
+    {
+      "id": "xiaomi-mi-tv-master-oled",
+      "device_hash": "xiaomi|androidtv|mi-tv-master-oled|2020",
+      "name": "Xiaomi Mi TV Master 65\" OLED (2020)",
+      "manufacturer": "Xiaomi",
+      "model": "Mi TV Master OLED",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 9", "PatchWall 3.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov", "avi"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 150000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 76,
+      "votes_down": 4,
+      "verified": true,
+      "notes": "Flagship Xiaomi OLED. Premium build with MediaTek MT9615 SoC. Full codec support."
+    },
+    {
+      "id": "xiaomi-mi-tv-p1-55",
+      "device_hash": "xiaomi|androidtv|mi-tv-p1|2021",
+      "name": "Xiaomi Mi TV P1 55\" (2021)",
+      "manufacturer": "Xiaomi",
+      "model": "Mi TV P1",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 10", "PatchWall 4.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "xiaomi-p1-mkv-hdr",
+          "title": "HDR Playback Issues in MKV",
+          "description": "High bitrate 4K HDR MKV files may stutter or fail to play. MP4 container is more reliable.",
+          "severity": "warning",
+          "codecs": ["hevc"],
+          "containers": ["mkv"],
+          "workaround": "Remux to MP4 or use lower bitrate for HDR content",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 198,
+      "votes_down": 22,
+      "verified": true,
+      "notes": "Popular mid-range Xiaomi TV. Good value with Android TV and Dolby Vision support."
+    },
+    {
+      "id": "xiaomi-mi-tv-4s-55",
+      "device_hash": "xiaomi|androidtv|mi-tv-4s|2020",
+      "name": "Xiaomi Mi TV 4S 55\" (2020)",
+      "manufacturer": "Xiaomi",
+      "model": "Mi TV 4S",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 9", "PatchWall 3.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "flac", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 80000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "xiaomi-4s-av1",
+          "title": "No AV1 Support",
+          "description": "Mi TV 4S does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC or H.264 encoded content",
+          "resolved": false
+        },
+        {
+          "id": "xiaomi-4s-dts",
+          "title": "Limited DTS Support",
+          "description": "Some regions/versions of Mi TV 4S do not support DTS passthrough.",
+          "severity": "info",
+          "codecs": ["dts", "dtshd"],
+          "workaround": "Transcode DTS to AC-3/E-AC-3",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 145,
+      "votes_down": 28,
+      "verified": true,
+      "notes": "Budget 4K Xiaomi TV. Good for the price but limited codec support. SoC varies by region."
+    },
+    {
+      "id": "xiaomi-mi-tv-stick",
+      "device_hash": "xiaomi|androidtv|mi-tv-stick|2020",
+      "name": "Xiaomi Mi TV Stick (2020)",
+      "manufacturer": "Xiaomi",
+      "model": "Mi TV Stick",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 9", "PatchWall 3.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 1920,
+        "max_height": 1080,
+        "max_bitrate": 30000000,
+        "supports_hdr": true,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": false,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "full_hd_hdr",
+      "known_issues": [
+        {
+          "id": "xiaomi-stick-4k-mkv",
+          "title": "1080p Only - No 4K Support",
+          "description": "Mi TV Stick only supports up to 1080p resolution. 4K content will be transcoded.",
+          "severity": "error",
+          "codecs": ["h264", "hevc", "vp9"],
+          "workaround": "Transcode to 1080p or use a 4K-capable device",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 234,
+      "votes_down": 45,
+      "verified": true,
+      "notes": "Budget streaming stick. Only 1080p. Good for casual streaming but limited for high-quality media."
+    },
+    {
+      "id": "xiaomi-mi-tv-stick-4k",
+      "device_hash": "xiaomi|androidtv|mi-tv-stick-4k|2022",
+      "name": "Xiaomi Mi TV Stick 4K (2022)",
+      "manufacturer": "Xiaomi",
+      "model": "Mi TV Stick 4K",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 11"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "opus", "mp3"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "mkv", "ts"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 50000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr",
+      "known_issues": [
+        {
+          "id": "xiaomi-stick-4k-dv",
+          "title": "No Dolby Vision Support",
+          "description": "Mi TV Stick 4K does not support Dolby Vision despite supporting HDR10.",
+          "severity": "info",
+          "codecs": ["hevc"],
+          "workaround": "Use HDR10 or convert DV content to HDR10",
+          "resolved": false
+        },
+        {
+          "id": "xiaomi-stick-4k-mkv-performance",
+          "title": "MKV Container Performance",
+          "description": "High bitrate MKV files may stutter. MP4 container recommended for best performance.",
+          "severity": "warning",
+          "codecs": ["hevc", "av1"],
+          "containers": ["mkv"],
+          "workaround": "Remux to MP4 for best playback performance",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 312,
+      "votes_down": 38,
+      "verified": true,
+      "notes": "4K streaming stick with AV1 support. Good value for basic 4K streaming. No DV."
+    },
+    {
+      "id": "redmi-smart-tv-x65",
+      "device_hash": "xiaomi|androidtv|redmi-tv-x|2020",
+      "name": "Redmi Smart TV X65 (2020)",
+      "manufacturer": "Redmi",
+      "model": "Smart TV X65",
+      "platform": "xiaomi_mi_tv",
+      "os_versions": ["Android TV 9", "PatchWall 3.0"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs", "ttml"],
+        "container_formats": ["mp4", "mkv", "ts", "m2ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": true,
+          "playready": true,
+          "clearkey": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "source": "official",
+      "votes_up": 167,
+      "votes_down": 14,
+      "verified": true,
+      "notes": "Redmi brand 4K TV with MediaTek MT9611 SoC. Good codec support for mid-range pricing."
+    }
+  ]
+}

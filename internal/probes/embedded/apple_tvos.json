@@ -1,0 +1,195 @@
+{
+  "_metadata": {
+    "platform": "apple_tvos",
+    "manufacturer": "Apple",
+    "version": "1.0.0",
+    "last_updated": "2026-03-23",
+    "source": "official_curated",
+    "description": "Apple TV device profiles covering tvOS. Best-in-class codec support with consistent AVFoundation capabilities. Apple Silicon A12+ provides full codec suite including Dolby Vision Profile 8 and all major audio codecs."
+  },
+  "devices": [
+    {
+      "id": "apple-tv-4k-3rd-2022",
+      "device_hash": "apple|tvos|apple-tv-4k-3rd|2022",
+      "name": "Apple TV 4K (3rd Gen) (2022)",
+      "manufacturer": "Apple",
+      "model": "Apple TV 4K (3rd Gen)",
+      "platform": "apple_tvos",
+      "os_versions": ["tvOS 16", "tvOS 17"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9", "av1"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 200000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": false,
+          "playready": false,
+          "clearkey": false,
+          "fairplay": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "apple-tvos-mkv",
+          "title": "No MKV Container Support",
+          "description": "Apple TV does not natively support MKV containers. Content must be in MP4/MOV format.",
+          "severity": "warning",
+          "containers": ["mkv"],
+          "workaround": "Remux MKV to MP4 container for native playback, or use Infuse/Plex",
+          "resolved": false
+        },
+        {
+          "id": "apple-tvos-webm",
+          "title": "No WebM Support",
+          "description": "WebM containers are not supported on tvOS.",
+          "severity": "warning",
+          "containers": ["webm"],
+          "workaround": "Convert WebM to MP4",
+          "resolved": false
+        },
+        {
+          "id": "apple-tvos-vp9-safari",
+          "title": "VP9 Limited to Browsers",
+          "description": "VP9 decoding is available in Safari but not via AVPlayer. Native playback prefers HEVC/AV1.",
+          "severity": "info",
+          "codecs": ["vp9"],
+          "workaround": "Use HEVC or AV1 for best native playback compatibility",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 892,
+      "votes_down": 8,
+      "verified": true,
+      "notes": "Best streaming device for codec support. A15 Bionic. Full DV Profile 8, all audio codecs. Use third-party apps (Infuse, Plex) for best MKV/AVI support."
+    },
+    {
+      "id": "apple-tv-4k-1st-2017",
+      "device_hash": "apple|tvos|apple-tv-4k-1st|2017",
+      "name": "Apple TV 4K (1st Gen) (2017)",
+      "manufacturer": "Apple",
+      "model": "Apple TV 4K (1st Gen)",
+      "platform": "apple_tvos",
+      "os_versions": ["tvOS 11", "tvOS 17"],
+      "capabilities": {
+        "video_codecs": ["h264", "hevc", "vp9"],
+        "audio_codecs": ["aac", "ac3", "eac3", "truehd", "flac", "opus", "mp3", "dts", "dtshd"],
+        "subtitle_formats": ["srt", "vtt", "ssa", "ass", "pgs"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 3840,
+        "max_height": 2160,
+        "max_bitrate": 100000000,
+        "supports_hdr": true,
+        "supports_10bit": true,
+        "supports_dolby_vision": true,
+        "supports_dolby_atmos": true,
+        "supports_dts": true,
+        "drm_support": {
+          "widevine": false,
+          "playready": false,
+          "clearkey": false,
+          "fairplay": true,
+          "max_resolution_uhd": true,
+          "max_resolution_fhd": true,
+          "dolby_vision": true
+        }
+      },
+      "recommended_profile": "ultra_hd_hdr_dv",
+      "known_issues": [
+        {
+          "id": "apple-4k-1st-av1",
+          "title": "No AV1 Support",
+          "description": "Original Apple TV 4K does not support AV1 decoding.",
+          "severity": "warning",
+          "codecs": ["av1"],
+          "workaround": "Use HEVC or H.264 encoded content",
+          "resolved": false
+        },
+        {
+          "id": "apple-4k-1st-hdr10plus",
+          "title": "No HDR10+ Support",
+          "description": "Apple TV 4K does not support HDR10+. Only HDR10 and Dolby Vision.",
+          "severity": "info",
+          "codecs": ["hevc"],
+          "workaround": "Use HDR10 or DV for HDR metadata",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 567,
+      "votes_down": 22,
+      "verified": true,
+      "notes": "Still excellent codec support. A10X Fusion chip. Full DV support. No AV1 or HDR10+."
+    },
+    {
+      "id": "apple-tv-hd",
+      "device_hash": "apple|tvos|apple-tv-hd|2015",
+      "name": "Apple TV HD (4th Gen) (2015)",
+      "manufacturer": "Apple",
+      "model": "Apple TV HD",
+      "platform": "apple_tvos",
+      "os_versions": ["tvOS 9", "tvOS 14"],
+      "capabilities": {
+        "video_codecs": ["h264"],
+        "audio_codecs": ["aac", "ac3", "eac3", "mp3"],
+        "subtitle_formats": ["srt", "vtt"],
+        "container_formats": ["mp4", "ts", "mov"],
+        "max_width": 1920,
+        "max_height": 1080,
+        "max_bitrate": 40000000,
+        "supports_hdr": false,
+        "supports_10bit": false,
+        "supports_dolby_vision": false,
+        "supports_dolby_atmos": true,
+        "supports_dts": false,
+        "drm_support": {
+          "widevine": false,
+          "playready": false,
+          "clearkey": false,
+          "fairplay": true,
+          "max_resolution_uhd": false,
+          "max_resolution_fhd": true,
+          "dolby_vision": false
+        }
+      },
+      "recommended_profile": "full_hd",
+      "known_issues": [
+        {
+          "id": "apple-hd-no-4k",
+          "title": "Only 1080p Maximum",
+          "description": "Apple TV HD only supports up to 1080p. All 4K content will be transcoded.",
+          "severity": "error",
+          "codecs": ["h264"],
+          "workaround": "Transcode 4K content to 1080p or use Apple TV 4K",
+          "resolved": false
+        },
+        {
+          "id": "apple-hd-no-hevc",
+          "title": "No HEVC Support",
+          "description": "Apple TV HD does not support HEVC decoding.",
+          "severity": "error",
+          "codecs": ["hevc"],
+          "workaround": "Transcode HEVC content to H.264",
+          "resolved": false
+        }
+      ],
+      "source": "official",
+      "votes_up": 234,
+      "votes_down": 67,
+      "verified": true,
+      "notes": "Legacy 1080p Apple TV. Very limited codec support. Only H.264/AC-3/AAC. Only useful for legacy content."
+    }
+  ]
+}
