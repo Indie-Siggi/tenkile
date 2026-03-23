@@ -967,10 +967,10 @@ Phase 4: Media Library + Streaming       ✅ COMPLETE
   4.6 WebSocket Events ──┤ ✓ COMPLETE (gorilla/websocket, event bus, real-time updates)
   4.7 Docker + Deploy ───┘ ✓ COMPLETE (docker-compose.yml, Dockerfile, nginx config)
                                      │
-Phase 5: Client Adapters              ○ PLANNED
-  5.1 Native Probes ───────┐ (needs 1.3, 2.2)
-  5.2 Android Probe ───────┤ (needs 5.1)
-  5.3 Apple Probe ─────────┘ (needs 5.1)
+Phase 5: Client Adapters              ✅ COMPLETE
+  5.1 Native Probes ─────┐ ✓ COMPLETE
+  5.2 Android Probe ─────┤ ✓ COMPLETE
+  5.3 Apple Probe ───────┘ ✓ COMPLETE
 
 Phase 6: Polish + Production           ○ PLANNED
 ```
@@ -981,6 +981,319 @@ Phase 6: Polish + Production           ○ PLANNED
 - 3.1 can start as soon as 1.3 is done (independent of Phase 2)
 - 4.1 can start as soon as 1.1 is done (independent of Phases 2–3)
 - 5.1 can start after 1.3 + 2.2 (independent of Phases 3–4)
+
+---
+
+## Architecture Review
+
+> **Last Updated:** Phase 4 Complete (2026-03-23)
+
+This section documents the current system architecture after Phase 4 completion.
+
+### Component Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                    CLIENTS                                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ Web Browser │  │ Android TV  │  │ Apple TV    │  │ Smart TVs (Tizen,   │ │
+│  │ (CodecProbe)│  │ (MediaCodec)│  │ (AVFound.)  │  │  WebOS, Roku)       │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘ │
+└─────────┼────────────────┼────────────────┼──────────────────────┼────────────┘
+          │                │                │                      │
+          │ HTTP/REST     │                │                      │
+          │ + WebSocket   │                │                      │
+          ▼                ▼                ▼                      ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                  TENKILE SERVER                                   │
+│                                                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐│
+│  │                          HTTP API (chi router)                               ││
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ ││
+│  │  │ AuthHandler  │  │LibraryHandler│  │ MediaHandler │  │AdminHandler  │ ││
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ ││
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ ││
+│  │  │DeviceHandler │  │PlaybackHandler│ │StreamHandler │  │ WebSocket    │ ││
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ ││
+│  └─────────────────────────────────────────────────────────────────────────────┘│
+│                                          │                                        │
+│  ┌───────────────────────────────────────┼───────────────────────────────────────┐│
+│  │                                       ▼                                        ││
+│  │  ┌─────────────────────────────────────────────────────────────────────────┐ ││
+│  │  │                    INTERNAL PACKAGES (Phase 1-4)                        │ ││
+│  │  │                                                                         │ ││
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │ ││
+│  │  │  │   probes/   │  │   server/   │  │  transcode/  │  │   media/    │  │ ││
+│  │  │  │             │  │             │  │              │  │             │  │ ││
+│  │  │  │ • types     │  │ • inventory │  │ • orchestr.  │  │ • scanner   │  │ ││
+│  │  │  │ • cache     │  │ • encoder   │  │ • quality    │  │ • ffprobe    │  │ ││
+│  │  │  │ • curated   │  │ • benchmark │  │ • ffmpeg     │  │ • store      │  │ ││
+│  │  │  │ • trust     │  │             │  │ • subtitle   │  │ • models     │  │ ││
+│  │  │  │ • feedback  │  │             │  │ • logger     │  │             │  │ ││
+│  │  │  │ • validator │  │             │  │ • matcher    │  │             │  │ ││
+│  │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │ ││
+│  │  │                                    │                    │               │ ││
+│  │  │         ┌─────────────────────────┼────────────────────┘               │ ││
+│  │  │         │                         ▼                                     │ ││
+│  │  │         │  ┌─────────────────────────────────────────────────────────┐   │ ││
+│  │  │         │  │                      stream/                             │   │ ││
+│  │  │         │  │              Handler + Segmenter + Models                │   │ ││
+│  │  │         │  └─────────────────────────────────────────────────────────┘   │ ││
+│  │  └───────────────────────────────────────────────────────────────────────────┘ ││
+│  │                                                                                 ││
+│  │  ┌───────────────────────────────────────────────────────────────────────────┐ ││
+│  │  │                         DATABASE (SQLite/PostgreSQL)                       │ ││
+│  │  │    users | devices | playback_feedback | media_libraries | media_items  │ ││
+│  │  └───────────────────────────────────────────────────────────────────────────┘ ││
+│  │                                                                                 ││
+│  │  ┌───────────────────────────────────────────────────────────────────────────┐ ││
+│  │  │                         EMBEDDED ASSETS (go:embed)                        │ ││
+│  │  │    • web client (Preact SPA)  • curated device database (12 platforms)   │ ││
+│  │  │    • migrations  • default config                                        │ ││
+│  │  └───────────────────────────────────────────────────────────────────────────┘ ││
+│  └───────────────────────────────────────────────────────────────────────────────┘│
+│                                          │                                        │
+└──────────────────────────────────────────┼────────────────────────────────────────┘
+                                           │
+                         ┌─────────────────┼─────────────────┐
+                         ▼                 ▼                 ▼
+                  ┌────────────┐    ┌────────────┐    ┌────────────┐
+                  │   FFmpeg   │    │   FFprobe  │    │   NVIDIA   │
+                  │  (encode)  │    │  (probe)   │    │  (nvidia-  │
+                  │            │    │            │    │   smi)     │
+                  └────────────┘    └────────────┘    └────────────┘
+```
+
+### Component Descriptions
+
+| Component | Package | Purpose | Key Types | Dependencies |
+|-----------|---------|---------|-----------|-------------|
+| **API Router** | `internal/api/router.go` | HTTP routing, middleware chain, CORS | `NewRouter()`, `ServeHTTP()` | All handlers |
+| **Auth Handler** | `internal/api/auth.go` | JWT issuance, token refresh, first-run, logout | `AuthHandler`, `Claims` | `golang-jwt`, `bcrypt` |
+| **Device Handler** | `internal/api/devices.go` | Probe registration, capability lookup, feedback | `DeviceHandlers` | `probes/` |
+| **Playback Handler** | `internal/api/playback.go` | Decision requests, transcode initiation | `PlaybackHandlers` | `transcode/` |
+| **Library Handler** | `internal/api/library.go` | Library CRUD, scan triggers, media browsing | `LibraryHandlers` | `media/` |
+| **Media Handler** | `internal/api/media.go` | Media item details, stream info | `MediaHandlers` | `media/` |
+| **Stream Handler** | `internal/stream/handler.go` | HLS manifest serving, segment delivery | `Handler` | `stream/`, `media/` |
+| **WebSocket Handler** | `internal/events/websocket.go` | Real-time event distribution | `WebSocketHandler` | `gorilla/websocket` |
+| **Admin Handler** | `internal/api/admin.go` | System stats, cache management, curated DB CRUD | `AdminHandlers` | All packages |
+| **Probes Package** | `internal/probes/` | Device capability resolution, trust scoring | `DeviceCapabilities`, `TrustResolver`, `Validator`, `CuratedDatabase` | SQLite |
+| **Server Package** | `internal/server/` | FFmpeg/HW capability discovery | `Inventory`, `ServerCapabilities`, `EncoderCapability` | FFmpeg, nvidia-smi |
+| **Transcode Package** | `internal/transcode/` | Playback decision engine, FFmpeg argument building | `Orchestrator`, `PlaybackDecision`, `FFmpegArgs` | `probes/`, `server/` |
+| **Media Package** | `internal/media/` | Library scanning, ffprobe integration, persistence | `Scanner`, `FFprobe`, `Store`, `Library`, `MediaItem` | SQLite, ffprobe |
+| **Stream Package** | `internal/stream/` | HLS/DASH segment generation | `Segmenter`, `HLSOptions`, `StreamVariant` | FFmpeg |
+| **Events Package** | `internal/events/` | Event bus for real-time notifications | `Bus`, `Event` | WebSocket |
+| **Database Package** | `internal/database/` | SQLite wrapper, migrations | `SQLite` | `modernc.org/sqlite` |
+| **Codec Package** | `pkg/codec/` | Codec constants, MIME type mapping | (constants) | None |
+| **Config Package** | `internal/config/` | YAML config loading | `Config` | `gopkg.in/yaml.v3` |
+
+### API Route Structure
+
+| Route | Method | Handler | Auth | Description |
+|-------|--------|---------|------|-------------|
+| **Auth** |
+| `/api/v1/auth/login` | POST | `AuthHandler.Login` | No | Login with credentials |
+| `/api/v1/auth/first-run` | POST | `AuthHandler.FirstRun` | No | Initial admin setup |
+| `/api/v1/auth/refresh` | POST | `AuthHandler.Refresh` | No | Refresh access token |
+| `/api/v1/auth/logout` | POST | `AuthHandler.Logout` | Yes | Invalidate refresh token |
+| `/api/v1/auth/me` | GET | `AuthHandler.Me` | Yes | Current user info |
+| **Libraries** |
+| `/api/v1/libraries` | GET | `LibraryHandler.List` | Yes | List all libraries |
+| `/api/v1/libraries` | POST | `LibraryHandler.Create` | Yes | Create library |
+| `/api/v1/libraries/{id}` | GET | `LibraryHandler.Get` | Yes | Get library |
+| `/api/v1/libraries/{id}` | PUT | `LibraryHandler.Update` | Yes | Update library |
+| `/api/v1/libraries/{id}` | DELETE | `LibraryHandler.Delete` | Yes | Delete library |
+| `/api/v1/libraries/{id}/scan` | POST | `LibraryHandler.Scan` | Yes | Trigger scan |
+| `/api/v1/libraries/{id}/scan/status` | GET | `LibraryHandler.ScanStatus` | Yes | Scan progress |
+| `/api/v1/libraries/{libraryId}/items` | GET | `LibraryHandler.Items` | Yes | List items (paginated) |
+| **Media** |
+| `/api/v1/media/{id}` | GET | `MediaHandler.Get` | Yes | Media item details |
+| `/api/v1/media/{id}/stream` | GET | `MediaHandler.StreamInfo` | Yes | Stream info + variants |
+| `/api/v1/media/{id}/play` | GET | `MediaHandler.Play` | Yes | Playback manifest |
+| **Devices** |
+| `/api/v1/devices/{id}/probe` | POST | `DeviceHandler.Probe` | Yes | Register probe results |
+| `/api/v1/devices/{id}/capabilities` | GET | `DeviceHandler.Capabilities` | Yes | Get capabilities |
+| `/api/v1/devices/{id}/validate` | POST | `DeviceHandler.Validate` | Yes | Validate capabilities |
+| `/api/v1/devices/search` | POST | `DeviceHandler.Search` | Yes | Search devices |
+| `/api/v1/devices/{id}/feedback` | POST | `DeviceHandler.Feedback` | Yes | Submit playback feedback |
+| `/api/v1/devices/{id}/feedback/stats` | GET | `DeviceHandler.FeedbackStats` | Yes | Get feedback stats |
+| `/api/v1/devices/{id}/reliable-codecs` | GET | `DeviceHandler.ReliableCodecs` | Yes | Get reliable codecs |
+| `/api/v1/devices/{id}/reprobe` | POST | `DeviceHandler.ReProbe` | Yes | Trigger re-probe |
+| `/api/v1/devices/{id}/trust` | GET | `DeviceHandler.TrustReport` | Yes | Get trust report |
+| **Playback** |
+| `/api/v1/playback/decision` | POST | `PlaybackHandler.Decide` | Yes | Get playback decision |
+| `/api/v1/playback/feedback` | POST | `PlaybackHandler.Feedback` | Yes | Report playback outcome |
+| `/api/v1/playback/transcode` | POST | `PlaybackHandler.Transcode` | Yes | Start transcode |
+| `/api/v1/playback/profiles` | GET | `PlaybackHandler.Profiles` | Yes | Get device profiles |
+| `/api/v1/playback/validate` | POST | `PlaybackHandler.Validate` | Yes | Validate playback |
+| **Stream** |
+| `/api/v1/stream/hls/{id}` | GET | `StreamHandler.ServeHLS` | Yes | Get HLS manifest |
+| `/api/v1/stream/hls/playlist` | GET | `StreamHandler.ServeHLSManifest` | Yes | Serve playlist file |
+| `/api/v1/stream/hls/segment` | GET | `StreamHandler.ServeHLSSegment` | Yes | Serve segment file |
+| **Admin** |
+| `/api/v1/admin/system` | GET | `AdminHandler.SystemInfo` | Admin | System information |
+| `/api/v1/admin/stats` | GET | `AdminHandler.Stats` | Admin | Aggregate statistics |
+| `/api/v1/admin/cache/clear` | POST | `AdminHandler.ClearCache` | Admin | Clear capability cache |
+| `/api/v1/admin/decisions` | GET | `AdminHandler.Decisions` | Admin | Query decision logs |
+| `/api/v1/admin/decisions/stats` | GET | `AdminHandler.DecisionStats` | Admin | Decision statistics |
+| `/api/v1/admin/curated/devices` | PUT | `AdminHandler.CreateCurated` | Admin | Create curated device |
+| `/api/v1/admin/curated/devices/{id}` | PUT | `AdminHandler.UpdateCurated` | Admin | Update curated device |
+| `/api/v1/admin/curated/devices/{id}` | DELETE | `AdminHandler.DeleteCurated` | Admin | Delete curated device |
+| `/api/v1/admin/curated/devices/{id}/vote` | POST | `AdminHandler.VoteCurated` | Admin | Vote on device |
+| `/api/v1/admin/curated/search` | POST | `AdminHandler.SearchCurated` | Admin | Search curated DB |
+| `/api/v1/admin/curated/version-match` | POST | `AdminHandler.VersionMatch` | Admin | Version-aware match |
+| `/api/v1/admin/curated/embedded/stats` | GET | `AdminHandler.EmbeddedStats` | Admin | Embedded DB stats |
+| `/api/v1/admin/curated/embedded/sync` | POST | `AdminHandler.SyncEmbedded` | Admin | Sync embedded to DB |
+| `/api/v1/admin/curated/export` | GET | `AdminHandler.ExportCurated` | Admin | Export curated DB |
+| `/api/v1/admin/curated/import` | POST | `AdminHandler.ImportCurated` | Admin | Import curated DB |
+| **Feedback** |
+| `/api/v1/feedback/metrics` | GET | `DeviceHandler.FeedbackMetrics` | Yes | Get feedback metrics |
+| **WebSocket** |
+| `/ws` | GET | `WebSocketHandler.Handle` | Yes | Real-time event stream |
+
+### Event Flow Diagrams
+
+#### Scan Event Flow
+
+```
+Client                    API                      Scanner                      Event Bus                    WebSocket
+  │                        │                          │                            │                          │
+  │──POST /libraries/{id}/scan──▶│                      │                            │                          │
+  │                        │──Start Scan────────────▶│                            │                          │
+  │                        │                         │──library:scan:started──▶│                          │
+  │                        │                         │                         │──▶│◀────────────────────────▶│
+  │                        │◀──202 Accepted──────────│                          │    (broadcast to clients)  │
+  │◀──202 Accepted─────────│                         │                            │                          │
+  │                        │                         │                            │                          │
+  │                        │◀──GET /scan/status──────│                            │                          │
+  │◀──Progress update───────│                         │                            │                          │
+  │                        │                         │──library:scan:progress──▶│                          │
+  │                        │                         │   (per-item)              │──▶│◀────────────────────────▶│
+  │                        │                         │                            │                          │
+  │                        │                         │──Process each file───────│                            │
+  │                        │                         │──Probe metadata─────────│                            │
+  │                        │                         │──Save to database───────│                            │
+  │                        │                         │                            │                          │
+  │                        │                         │──library:scan:complete──│                          │
+  │                        │                         │   (with stats)          │──▶│◀────────────────────────▶│
+  │                        │◀──GET /scan/status──────│                            │                          │
+  │◀──Scan complete────────│                         │                            │                          │
+```
+
+#### Stream Event Flow
+
+```
+Client                    API                   Orchestrator                 Segmenter                    FFmpeg
+  │                        │                         │                          │                          │
+  │──GET /media/{id}/play──▶│                         │                          │                          │
+  │                        │──Decide()────────────▶│                          │                          │
+  │                        │◀──PlaybackDecision─────│                          │                          │
+  │                        │   (direct play or transcode target)                │                          │
+  │◀──HLS manifest─────────│                         │                          │                          │
+  │                        │                         │                          │                          │
+  │──GET /stream/hls/{id}─▶│                         │                          │                          │
+  │                        │──stream:started──────▶│                          │                          │
+  │                        │                         │──GenerateHLS──────────▶│                          │
+  │                        │                         │                       │──FFmpeg process────────▶│
+  │                        │                         │◀──Segments───────────│                          │
+  │◀──M3U8 playlist────────│                         │                          │                          │
+  │                        │                         │                          │                          │
+  │──GET /stream/hls/seg──▶│                         │                          │                          │
+  │◀──Segment file─────────│                         │                          │                          │
+  │                        │                         │                          │                          │
+  │ (repeat for each segment)                         │                          │                          │
+  │                        │                         │──stream:ended─────────▶│                          │
+```
+
+#### Transcode Event Flow
+
+```
+Client                    API                   Orchestrator                  FFmpeg
+  │                        │                         │                          │
+  │──POST /playback/transcode─▶│                      │                          │
+  │                        │──Decide()────────────▶│                          │
+  │                        │◀──TranscodeDecision───│                          │
+  │                        │   (codec ladder applied)│                        │
+  │                        │                         │                          │
+  │                        │──transcode:started───▶│                          │
+  │                        │                         │                          │
+  │                        │──BuildFFmpegArgs()────▶│                          │
+  │                        │◀──FFmpegArgs──────────│                          │
+  │                        │                         │                          │
+  │                        │────────────────────▶│──ffmpeg command─────────▶│
+  │                        │                         │◀──stdout/stderr────────│
+  │                        │──transcode:progress──▶│   (per-frame logging)   │
+  │                        │──transcode:progress──▶│                          │
+  │◀──Progress events──────│                         │                          │
+  │                        │                         │◀──exit code────────────│
+  │                        │──transcode:complete──▶│   (success/failure)    │
+  │                        │                         │                          │
+  │──GET /media/{id}/play──▶│   (now serves transcoded file)                  │
+  │◀──Transcoded HLS───────│                         │                          │
+```
+
+### Data Flow Summary
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                              REQUEST LIFECYCLE                                  │
+│                                                                                │
+│  1. Client sends HTTP request with JWT Bearer token                           │
+│     ↓                                                                           │
+│  2. chi router matches route → applies middleware                               │
+│     ↓                                                                           │
+│  3. AuthMiddleware validates JWT → extracts Claims into context                │
+│     ↓                                                                           │
+│  4. Handler processes request, calls internal packages                         │
+│     ↓                                                                           │
+│  5. Database queries via Store layer                                           │
+│     ↓                                                                           │
+│  6. Response built → JSON serialized → HTTP response                           │
+│                                                                                │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                           PLAYBACK DECISION FLOW                                │
+│                                                                                │
+│  1. Client requests playback for media item + device                          │
+│     ↓                                                                           │
+│  2. Orchestrator.GetCapabilities(deviceID)                                      │
+│     ├── Check probes/cache for cached capabilities                             │
+│     ├── Check curated DB for known devices                                     │
+│     └── Apply trust scores                                                     │
+│     ↓                                                                           │
+│  3. Orchestrator.GetServerCapabilities()                                       │
+│     └── Returns server's FFmpeg/HW encoding abilities                          │
+│     ↓                                                                           │
+│  4. Orchestrator.Decide(item, deviceCaps)                                      │
+│     ├── Check subtitle compatibility (burn-in vs. external)                    │
+│     ├── Check video codec compatibility                                        │
+│     ├── Check audio codec compatibility                                        │
+│     └── Select encoder from server capabilities                                 │
+│     ↓                                                                           │
+│  5. Build FFmpegArgs for target codec/container                               │
+│     ↓                                                                           │
+│  6. Return PlaybackDecision (direct play, remux, or transcode target)         │
+│                                                                                │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                            TRUST SCORING FLOW                                   │
+│                                                                                │
+│  Sources (highest to lowest trust):                                            │
+│  ┌─────────────────────────────────────────────────────────────────────────┐  │
+│  │ PlaybackFeedback (0.95)  │  Actual playback success/failure             │  │
+│  │ CuratedDB (0.90)         │  Pre-verified device profiles                 │  │
+│  │ NativeProbe (0.85)       │  Platform-native capability detection          │  │
+│  │ CodecProbeFull (0.80)   │  All browser APIs agree                        │  │
+│  │ CodecProbePartial (0.50)│  Some browser APIs agree                        │  │
+│  │ SingleAPI (0.20)         │  Only one API available                         │  │
+│  │ StaticProfile (0.10)     │  Fallback heuristics                           │  │
+│  └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                │
+│  Resolution Rules:                                                             │
+│  • Highest-trust NEGATIVE overrides lower-trust POSITIVE (conservative)       │
+│  • Weighted consensus when multiple sources agree                              │
+│  • Trust decays over time without playback feedback                           │
+│  • Re-probe triggers after 3+ consecutive failures                           │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -2598,25 +2911,27 @@ GET    /api/v1/stream/hls/segment        # Serve segment file
 
 ## Next Steps (Priority Order)
 
-All Phase 4 tasks are complete. The following are Phase 5 priorities:
+All Phase 5 tasks are complete. Phase 6 focuses on production hardening:
 
-1. **Build Native Probe Interface (5.1)** - HIGH PRIORITY
-   - Create adapter interface in `internal/clients/`
-   - Implement web client adapter
-   - Document Android/Apple probe stubs
+1. **Performance Optimization** - MEDIUM PRIORITY
+   - FFmpeg pipeline optimization
+   - Concurrent transcode limits
+   - Memory pool optimization
 
-2. **Implement Android Probe (5.2)** - HIGH PRIORITY
-   - MediaCodec API integration
-   - HW decoder capability detection
-   - REST API reporting
+2. **Caching Improvements** - MEDIUM PRIORITY
+   - Transcoded segment caching
+   - CDN integration
+   - Cache invalidation
 
-3. **Implement Apple Probe (5.3)** - HIGH PRIORITY
-   - AVFoundation API integration
-   - HDR mode detection
-   - REST API reporting
+3. **Monitoring & Metrics** - MEDIUM PRIORITY
+   - Prometheus metrics
+   - Grafana dashboards
+   - Alerting setup
 
-4. **Phase 6: Polish + Production** - MEDIUM PRIORITY
-   - Performance optimization
+4. **Additional Platforms** - LOW PRIORITY
+   - tvOS native app
+   - Android TV native app
+   - Samsung/LG Smart TV apps
    - Caching improvements
    - Monitoring/metrics
 
@@ -2634,7 +2949,7 @@ All Phase 4 tasks are complete. The following are Phase 5 priorities:
 
 ## Phase 5: Client Adapters + Native Probes
 
-> **Status:** ○ PLANNED
+> **Status:** ✅ COMPLETE (3/3 sub-tasks complete)
 
 This phase adds platform-native probe implementations for Android and Apple devices, providing higher trust scores than browser-based CodecProbe.
 
@@ -2642,9 +2957,9 @@ This phase adds platform-native probe implementations for Android and Apple devi
 
 | Task | Status | Priority | Dependencies |
 |------|--------|----------|--------------|
-| **5.1 Native Probe Interface** | ○ NOT STARTED | HIGH | needs 1.3, 2.2 |
-| **5.2 Android Probe** | ○ NOT STARTED | HIGH | needs 5.1 |
-| **5.3 Apple Probe** | ○ NOT STARTED | HIGH | needs 5.1 |
+| **5.1 Native Probe Interface** | ✅ COMPLETE | HIGH | needs 1.3, 2.2 ✓ |
+| **5.2 Android Probe** | ✅ COMPLETE | HIGH | needs 5.1 ✓ |
+| **5.3 Apple Probe** | ✅ COMPLETE | HIGH | needs 5.1 ✓ |
 
 ### Agent Prompt 5.1: Platform-Specific Probe Interface
 

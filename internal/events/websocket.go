@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +31,9 @@ type WebSocketHub struct {
 
 	// Connection configuration
 	upgrader websocket.Upgrader
+
+	// Allowed origins for WebSocket connections
+	allowedOrigins []*regexp.Regexp
 
 	// Client mutex
 	mu sync.RWMutex
@@ -59,23 +64,52 @@ type WSMessage struct {
 }
 
 // NewWebSocketHub creates a new WebSocket hub
-func NewWebSocketHub(eventBus *EventBus) *WebSocketHub {
+func NewWebSocketHub(eventBus *EventBus, allowedOrigins []string) *WebSocketHub {
 	if eventBus == nil {
 		eventBus = GetBus()
 	}
 
+	// Compile allowed origin patterns
+	var originPatterns []*regexp.Regexp
+	for _, pattern := range allowedOrigins {
+		// Convert glob patterns to regex: localhost:* -> localhost:.*
+		regex := strings.ReplaceAll(pattern, "*", ".*")
+		regex = "^" + regex + "$"
+		if re, err := regexp.Compile(regex); err == nil {
+			originPatterns = append(originPatterns, re)
+		}
+	}
+
 	return &WebSocketHub{
-		clients:     make(map[*Client]bool),
-		subscribe:   make(chan *Client),
-		unsubscribe: make(chan *Client),
-		broadcast:   make(chan []byte),
-		eventBus:    eventBus,
+		clients:          make(map[*Client]bool),
+		subscribe:        make(chan *Client),
+		unsubscribe:      make(chan *Client),
+		broadcast:        make(chan []byte),
+		eventBus:         eventBus,
+		allowedOrigins:   originPatterns,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
-				// In production, implement proper origin checking
-				return true
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true // No origin header, allow (same-origin)
+				}
+
+				// If no patterns defined, allow all (dev mode with no restrictions)
+				if len(originPatterns) == 0 {
+					return true
+				}
+
+				// Check against allowed patterns
+				for _, pattern := range originPatterns {
+					if pattern.MatchString(origin) {
+						return true
+					}
+				}
+
+				log.Printf("WebSocket origin rejected: %s", origin)
+				return false
 			},
 		},
 	}

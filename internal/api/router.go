@@ -18,6 +18,7 @@ import (
 	"github.com/tenkile/tenkile/internal/database"
 	"github.com/tenkile/tenkile/internal/events"
 	"github.com/tenkile/tenkile/internal/probes"
+	"github.com/tenkile/tenkile/internal/stream"
 	"github.com/tenkile/tenkile/internal/transcode"
 )
 
@@ -51,14 +52,19 @@ type Router struct {
 	feedbackManager *probes.FeedbackManager
 	wsHub         *events.WebSocketHub
 
-	// Handlers
+	// Phase 1-3 Handlers
 	devices  *DeviceHandlers
 	playback *PlaybackHandlers
 	admin    *AdminHandlers
+
+	// Phase 4 Handlers
+	library *LibraryHandler
+	media   *MediaHandler
+	stream  *stream.Handler
 }
 
 // NewRouter creates a new Chi router with configured middleware and handlers
-func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.Orchestrator, decisionLog *transcode.DecisionLogger) http.Handler {
+func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.Orchestrator, decisionLog *transcode.DecisionLogger) *Router {
 	r := &Router{
 		Router:       chi.NewRouter(),
 		db:           db,
@@ -67,8 +73,8 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		decisionLog:  decisionLog,
 	}
 
-	// Initialize WebSocket hub
-	r.wsHub = events.NewWebSocketHub(nil)
+	// Initialize WebSocket hub with origin checking
+	r.wsHub = events.NewWebSocketHub(nil, cfg.Auth.AllowedOrigins)
 	go r.wsHub.Run()
 
 	// Initialize dependencies
@@ -192,13 +198,35 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 			auth.Post("/playback/validate", r.playback.handleValidateStream)
 			auth.Get("/playback/history", r.playbackHistoryHandler)
 
-			// Library endpoints (stubs for future phases)
-			auth.Route("/library", func(lib chi.Router) {
-				lib.Get("/", r.listLibrariesHandler)
-				lib.Get("/{libraryID}", r.getLibraryHandler)
-				lib.Get("/{libraryID}/items", r.listLibraryItemsHandler)
-				lib.Get("/{libraryID}/items/{itemID}", r.getLibraryItemHandler)
-			})
+			// Phase 4: Library endpoints
+			if r.library != nil {
+				auth.Route("/libraries", func(lib chi.Router) {
+					lib.Get("/", r.library.List)
+					lib.Post("/", r.library.Create)
+					lib.Get("/{id}", r.library.Get)
+					lib.Put("/{id}", r.library.Update)
+					lib.Delete("/{id}", r.library.Delete)
+					lib.Post("/{id}/scan", r.library.Scan)
+					lib.Get("/{id}/scan/status", r.library.ScanStatus)
+					lib.Get("/{libraryId}/items", r.library.ListItems)
+				})
+			}
+
+			// Phase 4: Media endpoints
+			if r.media != nil {
+				auth.Route("/media", func(m chi.Router) {
+					m.Get("/{id}", r.media.Get)
+					m.Get("/{id}/stream", r.media.StreamInfo)
+					m.Get("/{id}/play", r.media.Play)
+				})
+			}
+
+			// Phase 4: Stream endpoints
+			if r.stream != nil {
+				auth.Get("/stream/hls/{id}", r.stream.ServeHLS)
+				auth.Get("/stream/hls/playlist", r.stream.ServeHLSManifest)
+				auth.Get("/stream/hls/segment", r.stream.ServeHLSSegment)
+			}
 
 			// Legacy device endpoints
 			auth.Route("/devices", func(dev chi.Router) {
@@ -541,6 +569,56 @@ func (r *Router) GetCuratedDB() *probes.CuratedDatabase {
 // GetValidator returns the validator
 func (r *Router) GetValidator() *probes.Validator {
 	return r.validator
+}
+
+// GetOrchestrator returns the transcode orchestrator
+func (r *Router) GetOrchestrator() *transcode.Orchestrator {
+	return r.orchestrator
+}
+
+// GetWebSocketHub returns the WebSocket hub
+func (r *Router) GetWebSocketHub() *events.WebSocketHub {
+	return r.wsHub
+}
+
+// SetLibraryHandler sets the library handler for Phase 4 routes
+func (r *Router) SetLibraryHandler(h *LibraryHandler) {
+	r.library = h
+}
+
+// SetMediaHandler sets the media handler for Phase 4 routes
+func (r *Router) SetMediaHandler(h *MediaHandler) {
+	r.media = h
+}
+
+// SetStreamHandler sets the stream handler for Phase 4 routes
+func (r *Router) SetStreamHandler(h *stream.Handler) {
+	r.stream = h
+}
+
+// GetStreamHandler returns the stream handler
+func (r *Router) GetStreamHandler() *stream.Handler {
+	return r.stream
+}
+
+// Close gracefully shuts down the router and all its components
+func (r *Router) Close() {
+	// Close stream handler if set
+	if r.stream != nil {
+		r.stream.Close()
+	}
+
+	// Close capability cache if SQLite-backed
+	if r.cache != nil {
+		if err := r.cache.Close(); err != nil {
+			slog.Error("Failed to close capability cache", "error", err)
+		}
+	}
+
+	// Close WebSocket hub
+	if r.wsHub != nil {
+		events.GetBus().Close()
+	}
 }
 
 // rateLimiter provides simple rate limiting

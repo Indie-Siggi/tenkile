@@ -406,6 +406,11 @@ func (tr *TrustResolver) evaluateBehavior(data *DeviceTrustData) (float64, strin
 
 // scoreToLevel converts a numeric score to a trust level
 func (tr *TrustResolver) scoreToLevel(score float64) TrustLevel {
+	return TrustLevelFromScore(score)
+}
+
+// TrustLevelFromScore converts a numeric trust score to a TrustLevel
+func TrustLevelFromScore(score float64) TrustLevel {
 	switch {
 	case score >= 0.9:
 		return TrustLevelVerified
