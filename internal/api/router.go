@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	"github.com/tenkile/tenkile/internal/config"
 	"github.com/tenkile/tenkile/internal/database"
 	"github.com/tenkile/tenkile/internal/events"
+	"github.com/tenkile/tenkile/internal/metrics"
 	"github.com/tenkile/tenkile/internal/probes"
 	"github.com/tenkile/tenkile/internal/stream"
 	"github.com/tenkile/tenkile/internal/transcode"
@@ -147,8 +149,14 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		MaxAge:           300,
 	}))
 
+	// Metrics middleware for request tracking
+	r.Use(r.metricsMiddleware)
+
 	// Health check endpoint
 	r.Get("/health", r.healthCheckHandler)
+
+	// Metrics endpoint for Prometheus
+	r.Get("/metrics", r.metricsHandler)
 
 	// WebSocket endpoint for real-time events
 	r.Get("/ws", r.wsHub.ServeWS)
@@ -304,6 +312,117 @@ func (r *Router) healthCheckHandler(w http.ResponseWriter, req *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// metricsMiddleware wraps handlers to collect request metrics
+func (r *Router) metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		start := time.Now()
+
+		// Create response writer wrapper to capture status
+		wrapped := middleware.NewWrapResponseWriter(w, req.ProtoMajor)
+
+		next.ServeHTTP(wrapped, req)
+
+		// Record metrics
+		duration := time.Since(start)
+		endpoint := getEndpointKey(req)
+		m := metrics.Get()
+		m.RecordRequest(endpoint, req.Method, wrapped.Status(), duration)
+	})
+}
+
+// metricsHandler serves Prometheus metrics
+func (r *Router) metricsHandler(w http.ResponseWriter, req *http.Request) {
+	m := metrics.Get()
+	snapshot := m.Snapshot()
+
+	// Output in Prometheus format
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	output := fmt.Sprintf(`# HELP tenkile_active_streams Active streaming sessions
+# TYPE tenkile_active_streams gauge
+tenkile_active_streams %d
+
+# HELP tenkile_cache_hit_total Cache hits
+# TYPE tenkile_cache_hit_total counter
+tenkile_cache_hit_total %d
+
+# HELP tenkile_cache_miss_total Cache misses
+# TYPE tenkile_cache_miss_total counter
+tenkile_cache_miss_total %d
+
+# HELP tenkile_cache_hit_rate Cache hit rate
+# TYPE tenkile_cache_hit_rate gauge
+tenkile_cache_hit_rate %.4f
+
+# HELP tenkile_transcode_count Total transcodes
+# TYPE tenkile_transcode_count counter
+tenkile_transcode_count %d
+
+# HELP tenkile_transcode_errors Transcode errors
+# TYPE tenkile_transcode_errors counter
+tenkile_transcode_errors %d
+
+# HELP tenkile_devices_registered Registered devices
+# TYPE tenkile_devices_registered gauge
+tenkile_devices_registered %d
+
+# HELP tenkile_devices_active Active devices
+# TYPE tenkile_devices_active gauge
+tenkile_devices_active %d
+
+# HELP tenkile_ws_connections WebSocket connections
+# TYPE tenkile_ws_connections gauge
+tenkile_ws_connections %d
+
+# HELP tenkile_ws_messages_sent WebSocket messages sent
+# TYPE tenkile_ws_messages_sent counter
+tenkile_ws_messages_sent %d
+
+# HELP tenkile_ws_messages_recv WebSocket messages received
+# TYPE tenkile_ws_messages_recv counter
+tenkile_ws_messages_recv %d
+`,
+		snapshot.ActiveStreams,
+		snapshot.CacheHits,
+		snapshot.CacheMisses,
+		snapshot.CacheHitRate,
+		snapshot.TranscodeCount,
+		snapshot.TranscodeErrors,
+		snapshot.DevicesRegistered,
+		snapshot.DevicesActive,
+		snapshot.WSConnections,
+		snapshot.WSMessagesSent,
+		snapshot.WSMessagesRecv,
+	)
+
+	w.Write([]byte(output))
+}
+
+// getEndpointKey returns a normalized endpoint key for metrics
+func getEndpointKey(req *http.Request) string {
+	// Chi route patterns for normalization
+	switch {
+	case req.URL.Path == "/health":
+		return "/health"
+	case req.URL.Path == "/metrics":
+		return "/metrics"
+	case req.URL.Path == "/ws":
+		return "/ws"
+	case req.URL.Path == "/api/v1/capabilities", req.URL.Path == "/api/v1/devices/capabilities":
+		return "/api/v1/capabilities"
+	case req.URL.Path == "/api/v1/probe/report":
+		return "/api/v1/probe/report"
+	case req.URL.Path == "/api/v1/probe/scenarios":
+		return "/api/v1/probe/scenarios"
+	default:
+		// Generic bucket for API endpoints
+		if len(req.URL.Path) > 4 && req.URL.Path[:4] == "/api" {
+			return "/api/v1/*"
+		}
+		return req.URL.Path
+	}
 }
 
 // openAPIHandler serves the OpenAPI specification

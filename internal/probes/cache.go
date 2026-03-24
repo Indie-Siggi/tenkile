@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -124,6 +125,7 @@ func (c *CapabilityCache) initSQLite(dbPath string) error {
 		device_id TEXT PRIMARY KEY,
 		capabilities TEXT NOT NULL,
 		source TEXT NOT NULL DEFAULT 'probe',
+		platform TEXT,
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		expires_at TIMESTAMP NOT NULL,
 		access_count INTEGER NOT NULL DEFAULT 0,
@@ -133,6 +135,7 @@ func (c *CapabilityCache) initSQLite(dbPath string) error {
 	CREATE INDEX IF NOT EXISTS idx_cache_expires ON device_capabilities_cache(expires_at);
 	CREATE INDEX IF NOT EXISTS idx_cache_source ON device_capabilities_cache(source);
 	CREATE INDEX IF NOT EXISTS idx_cache_access ON device_capabilities_cache(access_count);
+	CREATE INDEX IF NOT EXISTS idx_cache_platform ON device_capabilities_cache(platform);
 	`
 
 	_, err = db.Exec(createTableSQL)
@@ -327,13 +330,19 @@ func (c *CapabilityCache) saveToSQLite(deviceID string, cached *CachedCapability
 		return
 	}
 
+	// Extract platform from capabilities for indexing
+	platform := ""
+	if cached.Capabilities != nil {
+		platform = cached.Capabilities.Platform
+	}
+
 	upsertSQL := `
 	INSERT OR REPLACE INTO device_capabilities_cache
-	(device_id, capabilities, source, created_at, expires_at, access_count, last_accessed)
-	VALUES (?, ?, ?, datetime('now'), datetime('now', ?), 0, datetime('now'))
+	(device_id, capabilities, source, platform, created_at, expires_at, access_count, last_accessed)
+	VALUES (?, ?, ?, ?, datetime('now'), datetime('now', ?), 0, datetime('now'))
 	`
 
-	_, err = c.db.Exec(upsertSQL, deviceID, capabilitiesJSON, cached.Source,
+	_, err = c.db.Exec(upsertSQL, deviceID, capabilitiesJSON, cached.Source, platform,
 		fmt.Sprintf("+%d seconds", int(c.sqliteTTL.Seconds())))
 
 	if err != nil {
@@ -408,27 +417,23 @@ func (c *CapabilityCache) recordMiss() {
 // evictOldest evicts the oldest entries when memory cache is full
 func (c *CapabilityCache) evictOldest() {
 	// Find entries to evict (oldest by last accessed)
-	type entry struct {
+	type evictionEntry struct {
 		deviceID     string
 		lastAccessed time.Time
 	}
 
-	var entries []entry
+	entries := make([]evictionEntry, 0, len(c.memoryCache))
 	for deviceID, cached := range c.memoryCache {
-		entries = append(entries, entry{
+		entries = append(entries, evictionEntry{
 			deviceID:     deviceID,
 			lastAccessed: cached.LastAccessed,
 		})
 	}
 
-	// Sort by last accessed (oldest first)
-	for i := 0; i < len(entries)-1; i++ {
-		for j := i + 1; j < len(entries); j++ {
-			if entries[j].lastAccessed.Before(entries[i].lastAccessed) {
-				entries[i], entries[j] = entries[j], entries[i]
-			}
-		}
-	}
+	// Sort by last accessed (oldest first) - O(n log n)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].lastAccessed.Before(entries[j].lastAccessed)
+	})
 
 	// Evict oldest 10% or at least 1 entry
 	evictCount := len(entries) / 10

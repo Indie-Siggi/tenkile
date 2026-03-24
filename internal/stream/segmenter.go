@@ -84,31 +84,50 @@ func (s *Segmenter) GenerateHLS(ctx context.Context, inputPath string, variants 
 		CreatedAt:      time.Now(),
 	}
 
-	// Generate segments for each variant
+	// Process variants in parallel
+	type variantResult struct {
+		playlist VariantPlaylist
+		err      error
+	}
+
+	resultChan := make(chan variantResult, len(variants))
+
 	for _, variant := range variants {
-		variantDir := filepath.Join(sessionDir, variant.Name)
-		if err := os.MkdirAll(variantDir, 0755); err != nil {
+		variant := variant // Capture loop variable
+		go func() {
+			variantDir := filepath.Join(sessionDir, variant.Name)
+			if err := os.MkdirAll(variantDir, 0755); err != nil {
+				resultChan <- variantResult{err: fmt.Errorf("create variant dir: %w", err)}
+				return
+			}
+
+			playlist := filepath.Join(variantDir, "playlist.m3u8")
+
+			// Build FFmpeg args for HLS
+			args := s.buildHLSArgs(inputPath, variant, playlist, opts)
+
+			output, err := s.runner.Run(ctx, args...)
+			if err != nil {
+				resultChan <- variantResult{err: fmt.Errorf("ffmpeg hls for %s: %w (output: %s)", variant.Name, err, string(output))}
+				return
+			}
+
+			resultChan <- variantResult{playlist: VariantPlaylist{
+				Name:        variant.Name,
+				Playlist:    playlist,
+				SegmentsDir: variantDir,
+			}}
+		}()
+	}
+
+	// Collect results
+	for i := 0; i < len(variants); i++ {
+		result := <-resultChan
+		if result.err != nil {
 			os.RemoveAll(sessionDir)
-			return nil, fmt.Errorf("create variant dir: %w", err)
+			return nil, result.err
 		}
-
-		playlist := filepath.Join(variantDir, "playlist.m3u8")
-
-		// Build FFmpeg args for HLS
-		args := s.buildHLSArgs(inputPath, variant, playlist, opts)
-
-		output, err := s.runner.Run(ctx, args...)
-		if err != nil {
-			// Clean up on error
-			os.RemoveAll(sessionDir)
-			return nil, fmt.Errorf("ffmpeg hls for %s: %w (output: %s)", variant.Name, err, string(output))
-		}
-
-		manifest.Variants = append(manifest.Variants, VariantPlaylist{
-			Name:        variant.Name,
-			Playlist:    playlist,
-			SegmentsDir: variantDir,
-		})
+		manifest.Variants = append(manifest.Variants, result.playlist)
 	}
 
 	// Generate master playlist

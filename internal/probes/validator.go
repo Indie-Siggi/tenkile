@@ -13,6 +13,20 @@ import (
 	"github.com/tenkile/tenkile/pkg/codec"
 )
 
+// Platform detection patterns - compiled once at package initialization
+var platformPatterns = map[string]*regexp.Regexp{
+	"ios":        regexp.MustCompile(`(?i)(iphone|ipad|ipod)`),
+	"android":    regexp.MustCompile(`(?i)android`),
+	"macos":      regexp.MustCompile(`(?i)(mac os|macintosh)`),
+	"windows":    regexp.MustCompile(`(?i)windows`),
+	"linux":      regexp.MustCompile(`(?i)linux`),
+	"chromecast": regexp.MustCompile(`(?i)(crkey|chromecast)`),
+	"roku":       regexp.MustCompile(`(?i)roku`),
+	"firetv":     regexp.MustCompile(`(?i)(fire tv|firetv)`),
+	"xbox":       regexp.MustCompile(`(?i)xbox`),
+	"playstation": regexp.MustCompile(`(?i)playstation`),
+}
+
 // ValidationResult represents the result of validating probe data
 type ValidationResult struct {
 	IsValid    bool              `json:"is_valid"`
@@ -631,19 +645,6 @@ func (v *Validator) validateDRMConsistency(caps *DeviceCapabilities, result *Val
 // checkUserAgentConsistency checks if user agent matches platform
 func (v *Validator) checkUserAgentConsistency(platform, userAgent string, result *ValidationResult) {
 	userAgentLower := strings.ToLower(userAgent)
-
-	platformPatterns := map[string]*regexp.Regexp{
-		"ios":       regexp.MustCompile(`(iphone|ipad|ipod)`),
-		"android":   regexp.MustCompile(`android`),
-		"macos":     regexp.MustCompile(`(mac os|macintosh)`),
-		"windows":   regexp.MustCompile(`windows`),
-		"linux":     regexp.MustCompile(`linux`),
-		"chromecast": regexp.MustCompile(`(crkey|chromecast)`),
-		"roku":      regexp.MustCompile(`roku`),
-		"firetv":    regexp.MustCompile(`(fire tv|firetv)`),
-		"xbox":      regexp.MustCompile(`xbox`),
-		"playstation": regexp.MustCompile(`playstation`),
-	}
 
 	pattern, ok := platformPatterns[platform]
 	if !ok {

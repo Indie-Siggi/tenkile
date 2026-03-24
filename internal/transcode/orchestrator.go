@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/tenkile/tenkile/internal/circuitbreaker"
 	"github.com/tenkile/tenkile/internal/events"
 	"github.com/tenkile/tenkile/internal/probes"
 	"github.com/tenkile/tenkile/internal/server"
@@ -116,11 +117,12 @@ type PlaybackDecision struct {
 // Orchestrator is the central transcode decision engine.
 // It replaces Jellyfin's StreamBuilder with a quality-preserving design.
 type Orchestrator struct {
-	inventory *server.Inventory
-	matcher   *DeviceMatcher
-	policy    QualityPreservationPolicy
-	subConfig SubtitleConfig
-	logger    *slog.Logger
+	inventory       *server.Inventory
+	matcher         *DeviceMatcher
+	policy          QualityPreservationPolicy
+	subConfig       SubtitleConfig
+	logger          *slog.Logger
+	transcodeBreaker *circuitbreaker.Breaker
 }
 
 // NewOrchestrator creates a new transcode orchestrator.
@@ -129,13 +131,32 @@ func NewOrchestrator(inv *server.Inventory, policy QualityPreservationPolicy, su
 		logger = slog.Default()
 	}
 
+	cb := circuitbreaker.New(circuitbreaker.DefaultConfig("transcode"))
+	
+	// Log circuit breaker state changes
+	cb.StateChangeHandler(func(name string, from, to circuitbreaker.State) {
+		logger.Warn("transcode circuit breaker state change",
+			"name", name, "from", from.String(), "to", to.String())
+	})
+
 	return &Orchestrator{
-		inventory: inv,
-		matcher:   NewDeviceMatcher(policy),
-		policy:    policy,
-		subConfig: subConfig,
-		logger:    logger,
+		inventory:         inv,
+		matcher:          NewDeviceMatcher(policy),
+		policy:           policy,
+		subConfig:        subConfig,
+		logger:           logger,
+		transcodeBreaker: cb,
 	}
+}
+
+// TranscodeBreaker returns the circuit breaker for transcode operations
+func (o *Orchestrator) TranscodeBreaker() *circuitbreaker.Breaker {
+	return o.transcodeBreaker
+}
+
+// IsTranscodeAvailable returns true if transcoding is available (circuit closed)
+func (o *Orchestrator) IsTranscodeAvailable() bool {
+	return o.transcodeBreaker.State() != circuitbreaker.StateOpen
 }
 
 // Decide makes a playback decision for the given media item and device.
@@ -143,16 +164,28 @@ func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *
 	start := time.Now()
 
 	decision := &PlaybackDecision{
-		SourceVideoCodec:       item.VideoCodec,
-		SourceAudioCodec:       item.AudioCodec,
-		SourceContainer:        item.Container,
-		SourceWidth:            item.Width,
-		SourceHeight:           item.Height,
-		SourceBitrate:          item.Bitrate,
-		SourceIsHDR:            item.IsHDR,
-		SourceInterlaced:       item.Interlaced,
-		SourcePixelAspectRatio: item.PixelAspectRatio,
-		DeviceCapabilityTrust:  deviceCaps.TrustScore,
+		SourceVideoCodec:        item.VideoCodec,
+		SourceAudioCodec:        item.AudioCodec,
+		SourceContainer:         item.Container,
+		SourceWidth:             item.Width,
+		SourceHeight:            item.Height,
+		SourceBitrate:           item.Bitrate,
+		SourceIsHDR:             item.IsHDR,
+		SourceInterlaced:        item.Interlaced,
+		SourcePixelAspectRatio:  item.PixelAspectRatio,
+		DeviceCapabilityTrust:   deviceCaps.TrustScore,
+	}
+
+	// Check if transcode circuit is open - if so, skip to direct play only
+	if !o.IsTranscodeAvailable() {
+		decision.Reasons = append(decision.Reasons, "transcode circuit breaker open - direct play only")
+		if o.tryDirectPlay(item, deviceCaps, decision) {
+			decision.DecisionDurationMs = time.Since(start).Milliseconds()
+			return decision
+		}
+		// No direct play possible, return degraded decision
+		decision.DecisionDurationMs = time.Since(start).Milliseconds()
+		return decision
 	}
 
 	// Step 1: Resolve subtitle decision FIRST (may force transcode)
@@ -173,6 +206,7 @@ func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *
 	}
 
 	// Step 4: Transcode — walk codec ladders
+	// Record attempt via circuit breaker (success or failure tracked elsewhere)
 	o.buildTranscode(item, deviceCaps, decision)
 	decision.DecisionDurationMs = time.Since(start).Milliseconds()
 
@@ -188,6 +222,15 @@ func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *
 	}
 
 	return decision
+}
+
+// RecordTranscodeResult records the result of a transcode operation for circuit breaker
+func (o *Orchestrator) RecordTranscodeResult(success bool) {
+	if success {
+		o.transcodeBreaker.RecordSuccess()
+	} else {
+		o.transcodeBreaker.RecordFailure()
+	}
 }
 
 func (o *Orchestrator) tryDirectPlay(item *MediaItem, caps *probes.DeviceCapabilities, decision *PlaybackDecision) bool {

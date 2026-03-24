@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -57,6 +58,7 @@ type CuratedDatabase struct {
 	devices    map[string]*CuratedDevice
 	hashIndex  map[string][]string // device_hash -> device IDs
 	platformIndex map[string][]string // platform -> device IDs
+	codecIndex map[string][]string // video codec -> device IDs
 	mu         sync.RWMutex
 
 	// Statistics
@@ -82,6 +84,7 @@ func NewCuratedDatabase() *CuratedDatabase {
 		devices:       make(map[string]*CuratedDevice),
 		hashIndex:     make(map[string][]string),
 		platformIndex: make(map[string][]string),
+		codecIndex:   make(map[string][]string),
 	}
 }
 
@@ -201,7 +204,7 @@ func (cd *CuratedDatabase) addDevice(device *CuratedDevice) error {
 	return nil
 }
 
-// updateIndexes updates the hash and platform indexes
+// updateIndexes updates the hash, platform, and codec indexes
 func (cd *CuratedDatabase) updateIndexes(device *CuratedDevice) {
 	// Update hash index
 	if device.DeviceHash != "" {
@@ -211,6 +214,14 @@ func (cd *CuratedDatabase) updateIndexes(device *CuratedDevice) {
 	// Update platform index
 	platform := strings.ToLower(device.Platform)
 	cd.platformIndex[platform] = append(cd.platformIndex[platform], device.ID)
+
+	// Update codec index for video codecs
+	if device.Capabilities != nil {
+		for _, codec := range device.Capabilities.VideoCodecs {
+			codecLower := strings.ToLower(codec)
+			cd.codecIndex[codecLower] = append(cd.codecIndex[codecLower], device.ID)
+		}
+	}
 }
 
 // GetByDeviceHash retrieves a device by its hash
@@ -235,6 +246,27 @@ func (cd *CuratedDatabase) GetByPlatform(platform string) []*CuratedDevice {
 
 	platform = strings.ToLower(platform)
 	deviceIDs, ok := cd.platformIndex[platform]
+	if !ok {
+		return nil
+	}
+
+	devices := make([]*CuratedDevice, 0, len(deviceIDs))
+	for _, id := range deviceIDs {
+		if device, ok := cd.devices[id]; ok {
+			devices = append(devices, device)
+		}
+	}
+
+	return devices
+}
+
+// GetByCodec retrieves all devices that support a specific video codec
+func (cd *CuratedDatabase) GetByCodec(codec string) []*CuratedDevice {
+	cd.mu.RLock()
+	defer cd.mu.RUnlock()
+
+	codec = strings.ToLower(codec)
+	deviceIDs, ok := cd.codecIndex[codec]
 	if !ok {
 		return nil
 	}
@@ -351,29 +383,17 @@ func matchesCriteria(device *CuratedDevice, criteria SearchCriteria) bool {
 
 // sortDevices sorts devices by votes and verified status
 func sortDevices(devices []*CuratedDevice) {
-	for i := 0; i < len(devices)-1; i++ {
-		for j := i + 1; j < len(devices); j++ {
-			shouldSwap := false
-
-			// Verified devices first
-			if devices[i].Verified && !devices[j].Verified {
-				shouldSwap = false
-			} else if !devices[i].Verified && devices[j].Verified {
-				shouldSwap = true
-			} else {
-				// Then by vote count
-				scoreI := devices[i].VotesUp - devices[i].VotesDown
-				scoreJ := devices[j].VotesUp - devices[j].VotesDown
-				if scoreI < scoreJ {
-					shouldSwap = true
-				}
-			}
-
-			if shouldSwap {
-				devices[i], devices[j] = devices[j], devices[i]
-			}
+	// Sort by votes and verified status - O(n log n)
+	sort.Slice(devices, func(i, j int) bool {
+		// Verified devices first
+		if devices[i].Verified != devices[j].Verified {
+			return devices[i].Verified
 		}
-	}
+		// Then by vote score
+		scoreI := devices[i].VotesUp - devices[i].VotesDown
+		scoreJ := devices[j].VotesUp - devices[j].VotesDown
+		return scoreI > scoreJ
+	})
 }
 
 // GetStats returns database statistics

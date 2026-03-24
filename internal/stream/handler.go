@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,28 +13,40 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/tenkile/tenkile/internal/circuitbreaker"
 	"github.com/tenkile/tenkile/internal/events"
 	"github.com/tenkile/tenkile/internal/media"
 )
 
 // Handler handles streaming HTTP requests
 type Handler struct {
-	segmenter    *Segmenter
-	mediaStore   *media.Store
-	sessionTTL   time.Duration
-	sessions     map[string]*StreamSession
-	mu           sync.RWMutex // protects sessions map
-	cleanupDone  chan struct{}
+	segmenter      *Segmenter
+	mediaStore     *media.Store
+	sessionTTL     time.Duration
+	sessions       map[string]*StreamSession
+	mu             sync.RWMutex // protects sessions map
+	cleanupDone    chan struct{}
+	ffmpegBreaker  *circuitbreaker.Breaker
 }
 
 // NewHandler creates a new streaming handler
 func NewHandler(mediaStore *media.Store) *Handler {
+	cb := circuitbreaker.New(circuitbreaker.DefaultConfig("ffmpeg"))
+	
+	// Log circuit breaker state changes
+	cb.StateChangeHandler(func(name string, from, to circuitbreaker.State) {
+		events.PublishEvent(events.EventStreamError, events.TopicStreams, events.StreamPayload{
+			MediaTitle: fmt.Sprintf("circuit_breaker:%s:%s->%s", name, from, to),
+		})
+	})
+
 	h := &Handler{
-		segmenter:  NewSegmenter("", "", nil),
-		mediaStore: mediaStore,
-		sessionTTL: 4 * time.Hour,
-		sessions:   make(map[string]*StreamSession),
-		cleanupDone: make(chan struct{}),
+		segmenter:     NewSegmenter("", "", nil),
+		mediaStore:    mediaStore,
+		sessionTTL:    4 * time.Hour,
+		sessions:      make(map[string]*StreamSession),
+		cleanupDone:  make(chan struct{}),
+		ffmpegBreaker: cb,
 	}
 	go h.cleanupLoop()
 	return h
@@ -124,7 +137,7 @@ func (h *Handler) ServeHLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate HLS manifest
+	// Generate HLS manifest with circuit breaker protection
 	variants := selectVariants(variant)
 	opts := HLSOptions{
 		SegmentDuration: 6,
@@ -132,8 +145,20 @@ func (h *Handler) ServeHLS(w http.ResponseWriter, r *http.Request) {
 		IncludeAudio:    true,
 	}
 
-	manifest, err := h.segmenter.GenerateHLS(r.Context(), item.Path, variants, opts)
+	// Use circuit breaker for FFmpeg transcoding
+	var manifest *HLSManifest
+	err = h.ffmpegBreaker.Do(func() error {
+		manifest, err = h.segmenter.GenerateHLS(r.Context(), item.Path, variants, opts)
+		return err
+	})
+
 	if err != nil {
+		// Circuit breaker is open - try fallback to direct stream
+		if errors.Is(err, circuitbreaker.ErrCircuitOpen) {
+			h.serveFallbackDirect(w, r, item, variant)
+			return
+		}
+
 		// Publish stream error event
 		events.PublishEvent(events.EventStreamError, events.TopicStreams, events.StreamPayload{
 			MediaItemID: mediaItemID,
@@ -163,10 +188,62 @@ func (h *Handler) ServeHLS(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"manifest": manifestURL,
-		"type":     "hls",
+		"manifest":   manifestURL,
+		"type":       "hls",
 		"session_id": session.ID,
 	})
+}
+
+// serveFallbackDirect serves the media file directly as a fallback when transcoding is unavailable
+func (h *Handler) serveFallbackDirect(w http.ResponseWriter, r *http.Request, item *media.MediaItem, variant string) {
+	// Check if circuit breaker is open
+	state := h.ffmpegBreaker.State()
+	
+	// Publish fallback event
+	events.PublishEvent(events.EventStreamError, events.TopicStreams, events.StreamPayload{
+		MediaItemID: item.ID,
+		MediaTitle:  fmt.Sprintf("fallback:%s:%s", item.Title, state),
+		Variant:     variant,
+	})
+
+	// Try to serve file directly if format allows
+	ext := strings.ToLower(filepath.Ext(item.Path))
+	directPlayable := map[string]bool{
+		".mp4": true, ".m4v": true, ".mkv": true, ".webm": true,
+	}
+
+	if directPlayable[ext] {
+		// Create session for direct playback
+		session, _ := h.StartSession(r.Context(), item.ID, "", "", variant, StreamTypeDirect)
+		session.ManifestPath = item.Path
+
+		// Set appropriate content type
+		contentType := "video/mp4"
+		if ext == ".mkv" {
+			contentType = "video/x-matroska"
+		} else if ext == ".webm" {
+			contentType = "video/webm"
+		}
+
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.Header().Set("Cache-Control", "no-cache")
+
+		// Publish direct play event
+		events.PublishEvent(events.EventStreamStarted, events.TopicStreams, events.StreamPayload{
+			StreamID:    session.ID,
+			SessionID:   session.ID,
+			MediaItemID: item.ID,
+			MediaTitle:  item.Title,
+			Variant:     "direct",
+		})
+
+		http.ServeFile(w, r, item.Path)
+		return
+	}
+
+	// No fallback available
+	http.Error(w, "Transcoding unavailable and direct playback not supported for this format", http.StatusServiceUnavailable)
 }
 
 // ServeHLSManifest serves HLS playlist files

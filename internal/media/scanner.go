@@ -2,12 +2,14 @@ package media
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/tenkile/tenkile/internal/circuitbreaker"
 	"github.com/tenkile/tenkile/internal/events"
 )
 
@@ -41,19 +43,38 @@ var SkipPatterns = []string{
 
 // Scanner handles media library scanning
 type Scanner struct {
-    ffprobe    *FFprobe
-    store      *Store
-    mu         sync.RWMutex
-    scanStatus map[string]*LibraryScanStatus
+    ffprobe      *FFprobe
+    store        *Store
+    mu           sync.RWMutex
+    scanStatus   map[string]*LibraryScanStatus
+    ffprobeBreaker *circuitbreaker.Breaker
 }
 
 // NewScanner creates a new media scanner
 func NewScanner(ffprobe *FFprobe, store *Store) *Scanner {
+    cb := circuitbreaker.New(circuitbreaker.DefaultConfig("ffprobe"))
+    
+    // Log circuit breaker state changes
+    cb.StateChangeHandler(func(name string, from, to circuitbreaker.State) {
+        events.PublishEvent(events.EventLibraryScanError, events.TopicLibraries, events.LibraryScanPayload{
+            LibraryID:   "",
+            LibraryName: "ffprobe",
+            Status:      string(ScanStatusError),
+            Error:       "circuit_breaker:" + name + ":" + from.String() + "->" + to.String(),
+        })
+    })
+
     return &Scanner{
-        ffprobe:    ffprobe,
-        store:      store,
-        scanStatus: make(map[string]*LibraryScanStatus),
+        ffprobe:       ffprobe,
+        store:        store,
+        scanStatus:   make(map[string]*LibraryScanStatus),
+        ffprobeBreaker: cb,
     }
+}
+
+// FFprobeBreaker returns the FFprobe circuit breaker
+func (s *Scanner) FFprobeBreaker() *circuitbreaker.Breaker {
+    return s.ffprobeBreaker
 }
 
 // ScanLibrary scans a library path and indexes all media files
@@ -133,10 +154,30 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib *Library) error {
         default:
         }
 
-        item, err := s.ffprobe.Probe(ctx, path)
-        if err != nil {
-            // Log but continue
-            continue
+        // Use circuit breaker for FFprobe calls
+        var item *MediaItem
+        var probeErr error = errors.New("not attempted")
+        
+        _ = s.ffprobeBreaker.Do(func() error {
+            item, probeErr = s.ffprobe.Probe(ctx, path)
+            if probeErr != nil {
+                return probeErr
+            }
+            // Record success
+            return nil
+        })
+        
+        if probeErr != nil {
+            s.ffprobeBreaker.RecordFailure()
+            // Create minimal media item from file info
+            item = &MediaItem{
+                ID:        generateID(path),
+                Path:      path,
+                LibraryID: lib.ID,
+                Title:     filepath.Base(path),
+            }
+        } else {
+            s.ffprobeBreaker.RecordSuccess()
         }
 
         item.LibraryID = lib.ID
