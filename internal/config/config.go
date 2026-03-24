@@ -171,7 +171,7 @@ func (c *Config) applyDefaults() {
 		c.Server.Host = "0.0.0.0"
 	}
 	if c.Server.Port == 0 {
-		c.Server.Port = 8080
+		c.Server.Port = 8765
 	}
 	if c.Server.ReadTimeout == 0 {
 		c.Server.ReadTimeout = 30 * time.Second

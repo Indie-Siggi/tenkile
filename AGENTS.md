@@ -2759,7 +2759,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o tenkile ./cmd/tenkile
 FROM scratch
 COPY --from=go-builder /app/tenkile /tenkile
 COPY configs/ /etc/tenkile/
-EXPOSE 8080
+EXPOSE 8765
 ENTRYPOINT ["/tenkile"]
 ```
 
@@ -2773,7 +2773,7 @@ services:
   tenkile:
     build: .
     ports:
-      - "8080:8080"
+      - "8765:8765"
     volumes:
       - ./configs/tenkile.yaml:/etc/tenkile/tenkile.yaml
       - media:/media
@@ -2806,7 +2806,7 @@ volumes:
 # configs/tenkile.prod.yaml
 server:
   host: "0.0.0.0"
-  port: "8080"
+  port: "8765"
 
 database:
   type: "postgres"
@@ -2823,7 +2823,7 @@ auth:
 **4. Add healthcheck**
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8765/health || exit 1
 ```
 
 **5. (Optional) Add nginx reverse proxy**
@@ -4426,8 +4426,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8765
+      targetPort: 8765
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -4451,7 +4451,7 @@ spec:
               service:
                 name: tenkile
                 port:
-                  number: 8080
+                  number: 8765
 ```
 
 **Multi-Region Setup:**

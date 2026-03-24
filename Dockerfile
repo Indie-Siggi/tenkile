@@ -51,7 +51,7 @@ COPY internal/database/migrations/ /etc/tenkile/migrations/
 RUN mkdir -p /data
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8765
 
 # Set working directory
 WORKDIR /data
