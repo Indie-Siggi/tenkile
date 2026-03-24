@@ -96,9 +96,11 @@ func NewWebSocketHub(eventBus *EventBus, allowedOrigins []string) *WebSocketHub 
 					return true // No origin header, allow (same-origin)
 				}
 
-				// If no patterns defined, allow all (dev mode with no restrictions)
+				// If no patterns defined, reject in production to prevent open proxy attacks
+				// Only allow all origins in development when explicitly needed
 				if len(originPatterns) == 0 {
-					return true
+					log.Printf("WebSocket origin rejected (no origins configured): %s", origin)
+					return false
 				}
 
 				// Check against allowed patterns

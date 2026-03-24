@@ -30,15 +30,61 @@ var MediaExtensions = map[string]bool{
     ".3gp":  true,
 }
 
-// Patterns to skip
+// Patterns to skip (checked against individual path components)
 var SkipPatterns = []string{
-    "/sample/",
-    "/samples/",
-    "/extras/",
-    "/bonus/",
-    "/trailers/",
-    "/.AppleDouble",
-    "/.DS_Store",
+    "sample",
+    "samples",
+    "extras",
+    "bonus",
+    "trailers",
+    ".AppleDouble",
+    ".DS_Store",
+    ".tmp",
+    ".cache",
+}
+
+// isPathComponentSkipped checks if a path component should be skipped
+// SECURITY FIX: Check individual path components instead of substring matching
+// to prevent false positives like "/media/sampler/example.mkv"
+func isPathComponentSkipped(path string) bool {
+	// Split path into components
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	
+	for _, part := range parts {
+		for _, pattern := range SkipPatterns {
+			if strings.EqualFold(part, pattern) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// validatePathForScanning validates a path before adding to scan list
+// Returns true if the path should be scanned
+func validatePathForScanning(path string) bool {
+	// Empty path is invalid
+	if path == "" {
+		return false
+	}
+	
+	// Path must be absolute or relative with valid characters
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return false
+	}
+	
+	// Check for null bytes (common injection attempt)
+	if strings.Contains(path, "\x00") {
+		return false
+	}
+	
+	// Path must exist
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		return false
+	}
+	
+	return true
 }
 
 // Scanner handles media library scanning
@@ -105,11 +151,14 @@ func (s *Scanner) ScanLibrary(ctx context.Context, lib *Library) error {
             return nil
         }
 
-        // Check if should skip
-        for _, pattern := range SkipPatterns {
-            if strings.Contains(path, pattern) {
-                return nil
-            }
+        // SECURITY FIX: Check if any path component should be skipped
+        if isPathComponentSkipped(path) {
+            return nil
+        }
+
+        // SECURITY FIX: Validate path before processing
+        if !validatePathForScanning(path) {
+            return nil
         }
 
         // Check extension

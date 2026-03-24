@@ -25,6 +25,38 @@ type Config struct {
 	Quality      QualityConfig      `yaml:"quality"`
 	Auth         AuthConfig         `yaml:"auth"`
 	Logging      LoggingConfig      `yaml:"logging"`
+	Security     SecurityConfig     `yaml:"security"`
+}
+
+// SecurityConfig holds security-related configuration
+type SecurityConfig struct {
+	// Enable/disable security headers
+	EnableHeaders bool `yaml:"enable_headers"`
+	
+	// Content-Security-Policy
+	CSP string `yaml:"csp"`
+	
+	// HSTS (Strict-Transport-Security)
+	HSTSEnabled bool `yaml:"hsts_enabled"`
+	HSTSMaxAge  int  `yaml:"hsts_max_age"` // in seconds
+	
+	// X-Frame-Options
+	XFrameOptions string `yaml:"x_frame_options"` // "DENY", "SAMEORIGIN", or empty to disable
+	
+	// X-Content-Type-Options
+	XContentTypeOptions string `yaml:"x_content_type_options"` // "nosniff" or empty to disable
+	
+	// X-XSS-Protection (deprecated but included for older browser compatibility)
+	XXSSProtection string `yaml:"x_xss_protection"` // "1; mode=block" or empty to disable
+	
+	// Referrer-Policy
+	ReferrerPolicy string `yaml:"referrer_policy"` // "strict-origin-when-cross-origin", "no-referrer", etc.
+	
+	// Permissions-Policy
+	PermissionsPolicy string `yaml:"permissions_policy"` // Feature policy
+	
+	// Custom additional headers (key: value pairs)
+	AdditionalHeaders map[string]string `yaml:"additional_headers"`
 }
 
 // ServerConfig holds HTTP server configuration
@@ -189,6 +221,64 @@ func (c *Config) applyDefaults() {
 			// Development: allow localhost
 			c.Auth.AllowedOrigins = []string{"http://localhost:*", "http://127.0.0.1:*"}
 		}
+	}
+	
+	// Apply security defaults
+	c.applySecurityDefaults()
+}
+
+func (c *Config) applySecurityDefaults() {
+	// Security headers enabled by default (unless explicitly disabled)
+	// Default CSP for media server
+	if c.Security.CSP == "" {
+		if c.Auth.ProductionMode {
+			c.Security.CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+		} else {
+			// Development: more permissive
+			c.Security.CSP = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://localhost:* http://localhost:*; frame-ancestors 'self';"
+		}
+	}
+	
+	// HSTS defaults
+	if c.Security.HSTSMaxAge == 0 {
+		if c.Auth.ProductionMode {
+			c.Security.HSTSMaxAge = 31536000 // 1 year
+		} else {
+			c.Security.HSTSMaxAge = 86400 // 1 day for dev
+		}
+	}
+	
+	// X-Frame-Options
+	if c.Security.XFrameOptions == "" {
+		if c.Auth.ProductionMode {
+			c.Security.XFrameOptions = "DENY"
+		} else {
+			c.Security.XFrameOptions = "SAMEORIGIN"
+		}
+	}
+	
+	// X-Content-Type-Options
+	if c.Security.XContentTypeOptions == "" {
+		c.Security.XContentTypeOptions = "nosniff"
+	}
+	
+	// X-XSS-Protection (deprecated but kept for older browsers)
+	if c.Security.XXSSProtection == "" {
+		c.Security.XXSSProtection = "1; mode=block"
+	}
+	
+	// Referrer-Policy
+	if c.Security.ReferrerPolicy == "" {
+		if c.Auth.ProductionMode {
+			c.Security.ReferrerPolicy = "strict-origin-when-cross-origin"
+		} else {
+			c.Security.ReferrerPolicy = "no-referrer-when-downgrade"
+		}
+	}
+	
+	// Permissions-Policy
+	if c.Security.PermissionsPolicy == "" {
+		c.Security.PermissionsPolicy = "geolocation=(), microphone=(), camera=(), payment=()"
 	}
 }
 

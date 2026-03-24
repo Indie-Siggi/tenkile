@@ -106,3 +106,44 @@ logging:
   output: "stdout"
   include_timestamp: true
   include_caller: false
+
+# Security headers configuration
+# SECURITY FIX: Configurable security headers for protection against common web vulnerabilities
+security:
+  # Enable/disable security headers (default: true)
+  enable_headers: true
+  
+  # Content-Security-Policy
+  # Controls which resources can be loaded
+  # For production, use 'self' only; for development, allows localhost and inline scripts
+  csp: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://localhost:* http://localhost:*; frame-ancestors 'self';"
+  
+  # HTTP Strict-Transport-Security (HSTS)
+  # Enforces HTTPS connections (only effective when TLS is enabled)
+  hsts_enabled: true
+  hsts_max_age: 86400  # 1 day for dev, use 31536000 (1 year) for production
+  
+  # X-Frame-Options
+  # Prevents clickjacking attacks - DENY blocks all framing, SAMEORIGIN allows same origin
+  x_frame_options: "SAMEORIGIN"
+  
+  # X-Content-Type-Options
+  # Prevents MIME type sniffing
+  x_content_type_options: "nosniff"
+  
+  # X-XSS-Protection
+  # XSS filter for older browsers (deprecated but included for compatibility)
+  x_xss_protection: "1; mode=block"
+  
+  # Referrer-Policy
+  # Controls how much referrer info is sent with requests
+  # Options: no-referrer, no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin
+  referrer_policy: "no-referrer-when-downgrade"
+  
+  # Permissions-Policy
+  # Controls which browser features can be used
+  permissions_policy: "geolocation=(), microphone=(), camera=(), payment=()"
+  
+  # Additional custom headers (key: value)
+  # additional_headers:
+  #   X-Custom-Header: "value"

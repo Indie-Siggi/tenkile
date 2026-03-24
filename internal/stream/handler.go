@@ -87,6 +87,7 @@ func (h *Handler) cleanupExpiredSessions() {
 }
 
 // cleanupOrphanedSegments removes HLS segment directories older than TTL
+// SECURITY FIX: Validate entry names before removing to prevent path traversal
 func (h *Handler) cleanupOrphanedSegments() {
 	tempDir := os.TempDir()
 	entries, err := os.ReadDir(tempDir)
@@ -96,17 +97,85 @@ func (h *Handler) cleanupOrphanedSegments() {
 
 	threshold := time.Now().Add(-h.sessionTTL)
 	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "hls_") {
+		name := entry.Name()
+		
+		// SECURITY FIX: Validate entry name before processing
+		// Only process entries that match expected HLS pattern
+		if !entry.IsDir() || !strings.HasPrefix(name, "hls_") {
 			continue
 		}
+		
+		// SECURITY FIX: Validate name contains only safe characters
+		// HLS directories should be like "hls_<random>" - no path separators or special chars
+		if !isValidHLSName(name) {
+			continue
+		}
+		
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
 		if info.ModTime().Before(threshold) {
-			os.RemoveAll(filepath.Join(tempDir, entry.Name()))
+			// Build full path and validate it's within temp directory
+			fullPath := filepath.Join(tempDir, name)
+			if isPathInDirectory(fullPath, tempDir) {
+				os.RemoveAll(fullPath)
+			}
 		}
 	}
+}
+
+// isValidHLSName validates that an HLS directory name is safe
+// SECURITY FIX: Prevent path traversal and injection attacks
+func isValidHLSName(name string) bool {
+	// Name must start with "hls_"
+	if !strings.HasPrefix(name, "hls_") {
+		return false
+	}
+	
+	// Name must not contain path separators or parent directory refs
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return false
+	}
+	
+	// Name must not contain parent directory reference
+	if strings.Contains(name, "..") {
+		return false
+	}
+	
+	// Name must not contain null bytes
+	if strings.Contains(name, "\x00") {
+		return false
+	}
+	
+	// Name should be reasonable length (hls_ + hex chars, max 64 chars)
+	if len(name) > 64 || len(name) < 5 {
+		return false
+	}
+	
+	return true
+}
+
+// isPathInDirectory checks if a path is within a directory (no symlink traversal)
+// SECURITY FIX: Prevent removal of files outside intended directory
+func isPathInDirectory(path, dir string) bool {
+	// Clean both paths
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+	
+	// Ensure directory path ends with separator for accurate comparison
+	if !strings.HasSuffix(absDir, string(filepath.Separator)) {
+		absDir += string(filepath.Separator)
+	}
+	
+	// Path must start with directory
+	return strings.HasPrefix(absPath, absDir)
 }
 
 // Close stops the cleanup goroutine

@@ -27,6 +27,18 @@ import (
 // deviceIDRegex validates device ID format (alphanumeric, hyphens, underscores, max 64 chars)
 var deviceIDRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
+// SECURITY FIX: Request size limits to prevent memory exhaustion
+const (
+	// MaxRequestBodySize is the maximum request body size (1MB)
+	MaxRequestBodySize = 1 << 20 // 1MB
+	
+	// MaxProbeReportSize is the maximum probe report size (1MB)
+	MaxProbeReportSize = 1 << 20 // 1MB
+	
+	// MaxFeedbackSize is the maximum feedback size (100KB)
+	MaxFeedbackSize = 100 << 10 // 100KB
+)
+
 // isValidDeviceID validates a device ID string
 func isValidDeviceID(id string) bool {
 	if len(id) == 0 || len(id) > 64 {
@@ -38,6 +50,103 @@ func isValidDeviceID(id string) bool {
 // isValidNumericField validates that a numeric field is positive and within reasonable bounds
 func isValidNumericField(value int64, min, max int64) bool {
 	return value >= min && value <= max
+}
+
+// securityHeadersMiddleware adds security headers to responses
+// SECURITY FIX: Adds standard security headers for protection against common attacks
+func securityHeadersMiddleware(cfg *config.SecurityConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip security headers only if explicitly disabled
+			if cfg != nil && cfg.EnableHeaders == false {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Content-Security-Policy
+			if cfg != nil && cfg.CSP != "" {
+				w.Header().Set("Content-Security-Policy", cfg.CSP)
+			} else {
+				// Default CSP for media server
+				w.Header().Set("Content-Security-Policy", "default-src 'self'")
+			}
+
+			// X-Frame-Options
+			if cfg != nil && cfg.XFrameOptions != "" {
+				w.Header().Set("X-Frame-Options", cfg.XFrameOptions)
+			} else {
+				// Default to DENY if not configured
+				w.Header().Set("X-Frame-Options", "DENY")
+			}
+
+			// X-Content-Type-Options
+			if cfg != nil && cfg.XContentTypeOptions != "" {
+				w.Header().Set("X-Content-Type-Options", cfg.XContentTypeOptions)
+			} else {
+				w.Header().Set("X-Content-Type-Options", "nosniff")
+			}
+
+			// Strict-Transport-Security (HSTS)
+			if cfg != nil && cfg.HSTSEnabled {
+				hstsValue := fmt.Sprintf("max-age=%d", cfg.HSTSMaxAge)
+				if cfg.HSTSMaxAge > 0 {
+					hstsValue += "; includeSubDomains"
+				}
+				w.Header().Set("Strict-Transport-Security", hstsValue)
+			}
+
+			// X-XSS-Protection
+			if cfg != nil && cfg.XXSSProtection != "" {
+				w.Header().Set("X-XSS-Protection", cfg.XXSSProtection)
+			} else {
+				w.Header().Set("X-XSS-Protection", "1; mode=block")
+			}
+
+			// Referrer-Policy
+			if cfg != nil && cfg.ReferrerPolicy != "" {
+				w.Header().Set("Referrer-Policy", cfg.ReferrerPolicy)
+			} else {
+				w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			}
+
+			// Permissions-Policy
+			if cfg != nil && cfg.PermissionsPolicy != "" {
+				w.Header().Set("Permissions-Policy", cfg.PermissionsPolicy)
+			}
+
+			// Additional custom headers
+			if cfg != nil && len(cfg.AdditionalHeaders) > 0 {
+				for k, v := range cfg.AdditionalHeaders {
+					w.Header().Set(k, v)
+				}
+			}
+
+			// Add security-related headers that are always good
+			w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// bodySizeLimitMiddleware creates middleware that limits request body size
+// SECURITY FIX: Prevents memory exhaustion from large request bodies
+func bodySizeLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > maxBytes {
+				http.Error(w, fmt.Sprintf("request body too large: %d bytes (max: %d)", r.ContentLength, maxBytes), http.StatusRequestEntityTooLarge)
+				return
+			}
+			
+			// Also limit reader if ContentLength is unknown (-1)
+			if r.ContentLength == -1 {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			}
+			
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // Router wraps chi.Router and holds handler dependencies
@@ -131,6 +240,9 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.RequestSize(10 << 20))
 
+	// SECURITY FIX: Add security headers middleware
+	r.Use(securityHeadersMiddleware(&cfg.Security))
+
 	// CORS configuration
 	allowedOrigins := cfg.Auth.AllowedOrigins
 	if len(allowedOrigins) == 0 {
@@ -167,9 +279,10 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		api.Group(func(pub chi.Router) {
 			pub.Get("/openapi.yaml", r.openAPIHandler)
 
-			// Device probe endpoints with rate limiting
+			// Device probe endpoints with rate limiting and body size limit
 			pub.Group(func(rl chi.Router) {
 				rl.Use(rateLimitMiddleware(r.rateLimiter))
+				rl.Use(bodySizeLimitMiddleware(MaxProbeReportSize))
 				rl.Post("/probe/report", r.devices.handleProbeReport)
 				rl.Get("/probe/scenarios", r.probeScenariosHandler)
 			})
@@ -182,6 +295,8 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		// Protected endpoints (auth required)
 		api.Group(func(auth chi.Router) {
 			auth.Use(r.authMiddleware)
+			// SECURITY FIX: Apply body size limit to all protected endpoints
+			auth.Use(bodySizeLimitMiddleware(MaxRequestBodySize))
 
 			// Device endpoints
 			auth.Get("/devices", r.devices.handleSearchDevices)

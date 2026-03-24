@@ -11,6 +11,25 @@ import (
 	"time"
 )
 
+// MaxProbeSize is the maximum allowed size for probe JSON in bytes (1MB)
+// SECURITY FIX: Prevents memory exhaustion from large JSON payloads
+const MaxProbeSize = 1 << 20 // 1MB
+
+// MaxCuratedSize is the maximum allowed size for curated device JSON (5MB)
+const MaxCuratedSize = 5 << 20 // 5MB
+
+// MaxFeedbackSize is the maximum allowed size for feedback JSON (100KB)
+const MaxFeedbackSize = 100 << 10 // 100KB
+
+// ValidateJSONSize checks if data size is within allowed limits
+// SECURITY FIX: Validate size before parsing to prevent memory exhaustion
+func ValidateJSONSize(data []byte, maxSize int, dataType string) error {
+	if len(data) > maxSize {
+		return fmt.Errorf("%s exceeds maximum size: %d bytes (max: %d)", dataType, len(data), maxSize)
+	}
+	return nil
+}
+
 // CodecProbeResult represents the JSON output from a codec probe scenario
 type CodecProbeResult struct {
 	DeviceID      string                 `json:"device_id"`
@@ -83,7 +102,13 @@ type TranscodingPrefs struct {
 }
 
 // ParseCodecProbe parses a codec probe JSON result into DeviceCapabilities
+// SECURITY FIX: Validates JSON size before parsing to prevent memory exhaustion
 func ParseCodecProbe(probeJSON []byte) (*DeviceCapabilities, error) {
+	// Validate size before parsing
+	if err := ValidateJSONSize(probeJSON, MaxProbeSize, "probe JSON"); err != nil {
+		return nil, err
+	}
+
 	var probe CodecProbeResult
 	if err := json.Unmarshal(probeJSON, &probe); err != nil {
 		return nil, fmt.Errorf("failed to parse probe JSON: %w", err)

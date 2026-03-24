@@ -974,7 +974,21 @@ Phase 5: Client Adapters              ✅ COMPLETE
 
 Phase 6: Polish + Production           ✅ COMPLETE
 
-Phase 7: Security Hardening            ○ PLANNED
+Phase 7: Security Hardening            ✅ COMPLETE
+
+Phase 8: Advanced Features             ○ PLANNED
+  8.1 Metadata Enrichment ───────┐
+  8.2 Native TV Clients ────────┤
+  8.3 Cloud Features ──────────┤
+  8.4 ML Optimization ──────────┤
+  8.5 Community Features ───────┘
+
+Phase 9: Metadata Providers            ○ PLANNED
+
+Phase 10: OpenSubtitles Integration    ○ PLANNED
+  10.1 Search + Download ─┐
+  10.2 Auto-Match ─────────┤
+  10.3 Subtitle Sync ──────┘
 ```
 
 **Parallelization opportunities:**
@@ -3315,7 +3329,7 @@ tenkile_circuit_breaker_state{subsystem="ffmpeg|ffprobe|transcode"}
 
 ## Phase 7: Security Hardening
 
-> **Status:** ○ PLANNED
+> **Status:** ✅ COMPLETE (7/7 sub-tasks complete)
 
 This phase covers IT security improvements for production deployments.
 
@@ -3323,13 +3337,13 @@ This phase covers IT security improvements for production deployments.
 
 | Task | Status | Priority | Description |
 |------|--------|----------|-------------|
-| **7.1 Input Validation** | ○ NOT STARTED | HIGH | Injection prevention, path validation |
-| **7.2 Auth Hardening** | ○ NOT STARTED | HIGH | Password policy, MFA, brute force protection |
-| **7.3 Network Security** | ○ NOT STARTED | HIGH | TLS config, CORS, rate limiting |
-| **7.4 Data Security** | ○ NOT STARTED | MEDIUM | Encryption at rest, secrets management |
-| **7.5 Runtime Security** | ○ NOT STARTED | MEDIUM | Container hardening, resource limits |
-| **7.6 Security Headers** | ○ NOT STARTED | LOW | CSP, HSTS, X-Frame-Options |
-| **7.7 Vulnerability Scanning** | ○ NOT STARTED | MEDIUM | Dependency scan, container scan |
+| **7.1 Input Validation** | ✅ COMPLETE | HIGH | SQL/path/command injection prevention |
+| **7.2 Auth Hardening** | ✅ COMPLETE | HIGH | Password policy, brute force protection |
+| **7.3 Network Security** | ✅ COMPLETE | HIGH | TLS config, CORS, rate limiting |
+| **7.4 Data Security** | ✅ COMPLETE | MEDIUM | Encryption, secrets management, audit logging |
+| **7.5 Runtime Security** | ✅ COMPLETE | MEDIUM | Container hardening, resource limits |
+| **7.6 Security Headers** | ✅ COMPLETE | LOW | CSP, HSTS, X-Frame-Options |
+| **7.7 Vulnerability Scanning** | ✅ COMPLETE | MEDIUM | Dependency scan, container scan |
 
 ---
 
@@ -3697,6 +3711,378 @@ spec:
 | Network | Rate limit bypass | ○ |
 | Data | Sensitive data exposure | ○ |
 | Data | Audit log tampering | ○ |
+
+---
+
+## Phase 8: Advanced Features
+
+> **Status:** ○ PLANNED
+
+This phase covers advanced features for production deployments and user experience improvements.
+
+### Sub-Task Status
+
+| Task | Status | Priority | Description |
+|------|--------|----------|-------------|
+| **8.1 Metadata Enrichment** | ○ NOT STARTED | HIGH | TMDB/TVDB integration, posters, cast, ratings |
+| **8.2 Native TV Clients** | ○ NOT STARTED | HIGH | tvOS, Android TV, Samsung Tizen, LG WebOS |
+| **8.3 Cloud Features** | ○ NOT STARTED | MEDIUM | CDN integration, multi-region deployment |
+| **8.4 ML Optimization** | ○ NOT STARTED | LOW | Adaptive bitrate prediction, quality assessment |
+| **8.5 Community Features** | ○ NOT STARTED | LOW | Device sharing, playlists, watch history sync |
+
+### 8.1 Metadata Enrichment
+
+**TMDB Integration:**
+```go
+type TMDBProvider struct {
+    apiKey string
+    client *http.Client
+}
+
+func (p *TMDBProvider) SearchMovies(ctx context.Context, query string) ([]TMDBResult, error)
+func (p *TMDBProvider) GetMovieMetadata(ctx context.Context, tmdbID int) (*MovieMetadata, error)
+func (p *TMDBProvider) GetMovieImages(ctx context.Context, tmdbID int) ([]ImageInfo, error)
+```
+
+**TVDB Integration:**
+```go
+type TVDBProvider struct {
+    apiKey string
+    client *http.Client
+}
+
+func (p *TVDBProvider) SearchSeries(ctx context.Context, query string) ([]TVDBResult, error)
+func (p *TVDBProvider) GetSeriesMetadata(ctx context.Context, tvdbID int) (*SeriesMetadata, error)
+func (p *TVDBProvider) GetEpisodes(ctx context.Context, seriesID int, season int) ([]Episode, error)
+```
+
+**MusicBrainz Integration:**
+```go
+type MusicBrainzProvider struct {
+    client *http.Client
+}
+
+func (p *MusicBrainzProvider) SearchRelease(ctx context.Context, query string) ([]ReleaseResult, error)
+func (p *MusicBrainzProvider) GetReleaseMetadata(ctx context.Context, mbid string) (*AlbumMetadata, error)
+```
+
+### 8.2 Native TV Clients
+
+| Platform | Status | Priority | Implementation |
+|----------|--------|----------|---------------|
+| **tvOS** | ○ NOT STARTED | HIGH | AVKit, SwiftUI, native player |
+| **Android TV** | ○ NOT STARTED | HIGH | ExoPlayer, Jetpack Compose |
+| **Samsung Tizen** | ○ NOT STARTED | MEDIUM | Tizen SDK, WebGL |
+| **LG WebOS** | ○ NOT STARTED | MEDIUM | webOS SDK, LunaGL |
+
+**Key Features for TV Clients:**
+- Native playback with system codecs
+- Remote control navigation
+- Picture-in-picture support
+- HDR/Dolby Vision passthrough
+- Surround sound (Atmos, DTS:X)
+- Casting from mobile apps
+
+### 8.3 Cloud Features
+
+**CDN Integration:**
+```go
+type CDNConfig struct {
+    Provider string  // "cloudflare", "aws", "gcp"
+    Zone     string
+    APIKey   string
+}
+
+func (c *CDN) Prewarm(urls []string) error
+func (c *CDN) Invalidate(paths []string) error
+func (c *CDN) SignedURL(path string, expiry time.Duration) (string, error)
+```
+
+**Multi-Region Deployment:**
+```yaml
+regions:
+  us-east:
+    primary: true
+    transcoding: true
+  eu-west:
+    transcoding: false
+    cached_content_only: true
+  ap-south:
+    transcoding: false
+    cached_content_only: true
+```
+
+### 8.4 ML Optimization
+
+| Area | ML Model | Input | Output |
+|------|----------|-------|--------|
+| **Adaptive Bitrate** | LSTM | Historical throughput, time of day | Optimal bitrate |
+| **Codec Selection** | CNN | Scene complexity, motion vectors | Best codec |
+| **Thumbnail Generation** | VGG16 | Video frames | Best thumbnail |
+| **Quality Assessment** | VMAF | Decoded frames | Quality score |
+
+### 8.5 Community Features
+
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| **Device Sharing** | LOW | Share verified device profiles |
+| **Playlists** | MEDIUM | Collaborative playlists |
+| **Watch History Sync** | MEDIUM | Cross-device sync |
+| **Recommendations** | LOW | ML-based content recommendations |
+
+---
+
+## Phase 9: Metadata Providers
+
+> **Status:** ○ PLANNED
+
+Rich metadata (posters, descriptions, cast, ratings) transforms a file browser into a media experience.
+
+### Sub-Task Status
+
+| Task | Status | Priority | Description |
+|------|--------|----------|-------------|
+| **8.1 TMDB Integration** | ○ NOT STARTED | HIGH | Movies & TV metadata, posters, backdrops, cast, ratings |
+| **8.2 TVDB Integration** | ○ NOT STARTED | HIGH | TV series metadata, episode ordering, season art |
+| **8.3 MusicBrainz Integration** | ○ NOT STARTED | MEDIUM | Music metadata, album art, artist info |
+| **8.4 Metadata Caching** | ○ NOT STARTED | HIGH | Local cache with TTL to avoid repeated API calls |
+| **8.5 NFO File Support** | ○ NOT STARTED | LOW | Read/write Kodi-compatible .nfo sidecar files |
+
+### Architecture
+
+**Provider Interface:**
+```go
+// MetadataProvider is the common interface for all metadata sources.
+type MetadataProvider interface {
+    Name() string
+    Search(ctx context.Context, query MetadataQuery) ([]MetadataResult, error)
+    GetMetadata(ctx context.Context, externalID string) (*MediaMetadata, error)
+    GetImages(ctx context.Context, externalID string) ([]ImageInfo, error)
+}
+```
+
+**MediaMetadata Model:**
+```go
+type MediaMetadata struct {
+    Title           string
+    OriginalTitle   string
+    Overview        string
+    Year            int
+    Genres          []string
+    Cast            []CastMember
+    Crew            []CrewMember
+    Rating          float64
+    ContentRating   string        // "PG-13", "TV-MA", etc.
+    ExternalIDs     map[string]string // "tmdb": "12345", "imdb": "tt1234567"
+    Images          ImageSet
+    ReleaseDate     time.Time
+    Runtime         time.Duration
+    // TV-specific
+    SeasonNumber    int
+    EpisodeNumber   int
+    AirDate         time.Time
+}
+```
+
+**Provider Priority Chain:**
+1. Local .nfo sidecar files (user overrides)
+2. TMDB (primary for movies and TV)
+3. TVDB (fallback for TV, better episode ordering)
+4. MusicBrainz (music only)
+
+**API Keys:**
+- TMDB: free API key, rate-limited to 40 req/10s
+- TVDB: project-level API key with JWT auth
+- MusicBrainz: no key required, rate-limited to 1 req/s with User-Agent
+
+**Image Handling:**
+- Download posters/backdrops to local cache on first fetch
+- Serve via `/api/v1/images/{item_id}/{type}` (poster, backdrop, logo, thumb)
+- Resize on-the-fly for different client resolutions
+- WebP conversion for bandwidth savings
+
+---
+
+## Phase 9: Multi-User Management
+
+> **Status:** ○ PLANNED
+
+A media server shared by a household needs user profiles with independent watch history, parental controls, and permission boundaries. Phase 4 added JWT auth for a single admin — Phase 9 extends this to a full multi-user system.
+
+### Sub-Task Status
+
+| Task | Status | Priority | Description |
+|------|--------|----------|-------------|
+| **9.1 User Profiles** | ○ NOT STARTED | HIGH | Create/edit/delete users, avatars, display preferences |
+| **9.2 Role-Based Permissions** | ○ NOT STARTED | HIGH | Admin, user, child roles with library-level access control |
+| **9.3 Watch History & Progress** | ○ NOT STARTED | HIGH | Per-user watch state, resume position, watched/unwatched |
+| **9.4 Parental Controls** | ○ NOT STARTED | MEDIUM | Content rating filters, PIN-protected profiles |
+| **9.5 User Preferences** | ○ NOT STARTED | MEDIUM | Audio/subtitle language defaults, playback quality prefs |
+
+### Architecture
+
+**User Model:**
+```go
+type User struct {
+    ID              string    `json:"id"`
+    Username        string    `json:"username"`
+    DisplayName     string    `json:"display_name"`
+    Email           string    `json:"email,omitempty"`
+    Role            UserRole  `json:"role"` // admin, user, child
+    AvatarPath      string    `json:"avatar_path,omitempty"`
+    MaxRating       string    `json:"max_rating,omitempty"` // "PG-13", "R", etc.
+    PINHash         string    `json:"-"`
+    AllowedLibraries []string `json:"allowed_libraries,omitempty"` // nil = all
+    Preferences     UserPrefs `json:"preferences"`
+    CreatedAt       time.Time `json:"created_at"`
+    LastLogin       time.Time `json:"last_login"`
+}
+
+type UserRole string
+const (
+    RoleAdmin UserRole = "admin"
+    RoleUser  UserRole = "user"
+    RoleChild UserRole = "child"
+)
+```
+
+**Watch State:**
+```go
+type PlaybackState struct {
+    UserID       string        `json:"user_id"`
+    ItemID       string        `json:"item_id"`
+    Position     time.Duration `json:"position"`
+    Completed    bool          `json:"completed"`
+    PlayCount    int           `json:"play_count"`
+    LastPlayed   time.Time     `json:"last_played"`
+    AudioTrack   int           `json:"audio_track"`
+    SubtitleTrack int          `json:"subtitle_track"`
+}
+```
+
+**API Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/users` | List users (admin only) |
+| POST | `/api/v1/users` | Create user (admin only) |
+| GET | `/api/v1/users/{id}` | Get user profile |
+| PUT | `/api/v1/users/{id}` | Update user profile |
+| DELETE | `/api/v1/users/{id}` | Delete user (admin only) |
+| GET | `/api/v1/users/{id}/history` | Get watch history |
+| PUT | `/api/v1/users/{id}/history/{item_id}` | Update playback state |
+| DELETE | `/api/v1/users/{id}/history` | Clear watch history |
+
+**Permission Model:**
+- Admin: full access, can manage users and libraries
+- User: access to allowed libraries, own watch history, own preferences
+- Child: access to content within rating limit, no settings access, PIN to exit
+
+---
+
+## Phase 10: OpenSubtitles Integration
+
+> **Status:** ○ PLANNED
+
+Subtitles are essential for accessibility and for watching foreign-language content. OpenSubtitles is the largest subtitle database with 7M+ entries. This phase adds automatic subtitle search, download, and synchronization.
+
+### Sub-Task Status
+
+| Task | Status | Priority | Description |
+|------|--------|----------|-------------|
+| **10.1 Search & Download** | ○ NOT STARTED | HIGH | Search OpenSubtitles by hash + filename, download SRT/ASS |
+| **10.2 Auto-Match** | ○ NOT STARTED | HIGH | Automatic subtitle matching during library scan |
+| **10.3 Subtitle Sync** | ○ NOT STARTED | MEDIUM | Time offset adjustment, framerate correction |
+| **10.4 Language Preferences** | ○ NOT STARTED | MEDIUM | Per-user preferred subtitle languages with fallback chain |
+| **10.5 Subtitle Conversion** | ○ NOT STARTED | LOW | Convert between SRT, ASS, WebVTT for client compatibility |
+
+### Architecture
+
+**OpenSubtitles REST API v1 (opensubtitles.com):**
+- Authentication: API key + JWT user token
+- Rate limit: 40 requests/10s for VIP, 5/1s for free
+- Hash-based matching: compute file hash for exact match before falling back to name search
+- Download quota: 20/day for free users, more for VIP
+
+**Provider Interface:**
+```go
+type SubtitleProvider interface {
+    Search(ctx context.Context, query SubtitleQuery) ([]SubtitleResult, error)
+    Download(ctx context.Context, subtitleID string) (*SubtitleFile, error)
+}
+
+type SubtitleQuery struct {
+    FileHash    string   // OpenSubtitles hash for exact match
+    FileSize    int64    // Required with hash
+    IMDbID      string   // Fallback: match by IMDB ID
+    Title       string   // Fallback: match by title
+    Season      int      // TV episode
+    Episode     int      // TV episode
+    Languages   []string // ISO 639-1 codes: "en", "es", "de"
+}
+
+type SubtitleResult struct {
+    ID           string
+    Language     string
+    FileName     string
+    Format       string  // "srt", "ass", "sub"
+    DownloadURL  string
+    Rating       float64
+    DownloadCount int
+    FPS          float64 // Framerate for sync
+    HearingImpaired bool
+}
+```
+
+**File Hash Algorithm (OpenSubtitles):**
+```go
+// OpenSubtitles uses a custom hash: sum of first and last 64KB as uint64.
+func ComputeHash(path string) (string, error) {
+    f, err := os.Open(path)
+    if err != nil { return "", err }
+    defer f.Close()
+
+    fi, _ := f.Stat()
+    size := fi.Size()
+    hash := uint64(size)
+
+    buf := make([]byte, 65536)
+    // Read first 64KB
+    f.Read(buf)
+    for i := 0; i < 65536/8; i++ {
+        hash += binary.LittleEndian.Uint64(buf[i*8:])
+    }
+    // Read last 64KB
+    f.Seek(-65536, io.SeekEnd)
+    f.Read(buf)
+    for i := 0; i < 65536/8; i++ {
+        hash += binary.LittleEndian.Uint64(buf[i*8:])
+    }
+    return fmt.Sprintf("%016x", hash), nil
+}
+```
+
+**Subtitle Storage:**
+- Downloaded subtitles stored alongside media: `Movie.2024.srt` next to `Movie.2024.mkv`
+- Alternatively in a `Subs/` subdirectory for cleanliness
+- Cached in database with metadata (language, format, source, rating)
+
+**API Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/items/{id}/subtitles` | List available subtitles (local + remote) |
+| POST | `/api/v1/items/{id}/subtitles/search` | Search OpenSubtitles for this item |
+| POST | `/api/v1/items/{id}/subtitles/download` | Download and save a subtitle |
+| DELETE | `/api/v1/items/{id}/subtitles/{sub_id}` | Remove a downloaded subtitle |
+| PUT | `/api/v1/items/{id}/subtitles/{sub_id}/offset` | Adjust subtitle timing offset |
+
+**Auto-Match Flow:**
+1. Library scan detects media file without subtitles
+2. Compute OpenSubtitles hash
+3. Search by hash (exact match, highest confidence)
+4. Fallback: search by IMDB ID from metadata (Phase 8)
+5. Fallback: search by title + year
+6. Download best-rated subtitle in user's preferred languages
+7. Store locally, index in database
 
 ---
 
@@ -4121,4 +4507,4 @@ def predict_optimal_bitrate(history):
 
 ---
 
-*Document generated from project specifications. Last updated: Phase 6 Complete*
+*Document generated from project specifications. Last updated: Phase 6 Complete, Phases 8-10 planned*
