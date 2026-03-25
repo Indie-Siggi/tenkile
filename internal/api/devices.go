@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/tenkile/tenkile/internal/probes"
@@ -174,6 +175,14 @@ func (h *DeviceHandlers) handleGetCapabilities(w http.ResponseWriter, r *http.Re
 		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error:   "missing_identifier",
 			Message: "device_id or device_hash is required",
+		})
+		return
+	}
+
+	if deviceID != "" && !isValidDeviceID(deviceID) {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_device_id",
+			Message: "Device ID format is invalid",
 		})
 		return
 	}
@@ -381,6 +390,14 @@ func (h *DeviceHandlers) handleGetDevicesByPlatform(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if !isValidDeviceID(platform) {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_platform",
+			Message: "Platform format is invalid",
+		})
+		return
+	}
+
 	devices := h.curatedDB.GetByPlatform(platform)
 
 	RespondJSON(w, http.StatusOK, map[string]interface{}{
@@ -461,6 +478,14 @@ func (h *DeviceHandlers) handlePlaybackFeedback(w http.ResponseWriter, r *http.R
 		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
 			Error:   "missing_device_id",
 			Message: "Device ID is required",
+		})
+		return
+	}
+
+	if !isValidDeviceID(deviceID) {
+		RespondJSON(w, http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_device_id",
+			Message: "Device ID format is invalid",
 		})
 		return
 	}
@@ -602,8 +627,7 @@ func (h *DeviceHandlers) handleGetReliableCodecs(w http.ResponseWriter, r *http.
 	// Get minimum success rate from query parameter (default 0.8)
 	minSuccessRate := 0.8
 	if rate := r.URL.Query().Get("min_rate"); rate != "" {
-		var f float64
-		if err := json.Unmarshal([]byte(rate), &f); err == nil {
+		if f, err := strconv.ParseFloat(rate, 64); err == nil {
 			minSuccessRate = f
 		}
 	}

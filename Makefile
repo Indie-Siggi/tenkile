@@ -1,4 +1,4 @@
-.PHONY: build build-web build-go dev test lint generate migrate-up migrate-new docker release clean
+.PHONY: build build-web build-go dev test lint generate migrate-up migrate-new docker docker-test release clean
 
 # Application name
 APP_NAME := tenkile
@@ -67,6 +67,10 @@ migrate-new:
 docker:
 	@echo "Building Docker image..."
 	docker build -t $(APP_NAME):$(VERSION) .
+
+docker-test:
+	@echo "Running tests in Docker..."
+	docker build --target test -t $(APP_NAME)-test:$(VERSION) .
 
 release:
 	@echo "Creating release build..."

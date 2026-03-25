@@ -37,6 +37,9 @@ type SegmentCache struct {
 	// Eviction callback
 	onEvict func(key string, data []byte)
 
+	// Done channel for stopping cleanup goroutine
+	done chan struct{}
+
 	// Metrics
 	metrics *Metrics
 }
@@ -88,6 +91,7 @@ func NewSegmentCache(config SegmentCacheConfig) (*SegmentCache, error) {
 		l2Dir:       config.DiskCacheDir,
 		l2MaxSize:   config.DiskCacheSize,
 		defaultTTL:  config.DefaultTTL,
+		done:        make(chan struct{}),
 		metrics:     Get(),
 	}
 
@@ -219,25 +223,20 @@ func (sc *SegmentCache) setL1(key string, data []byte) {
 		if entry.LLElem != nil {
 			sc.l1List.MoveToFront(entry.LLElem)
 		}
+		sc.l1Size += size
 	} else {
-		elem := sc.l1List.PushFront(&L1Entry{
-			Key:       key,
-			Data:      data,
-			Size:      size,
-			ExpiresAt: time.Now().Add(sc.defaultTTL),
+		newEntry := &L1Entry{
+			Key:         key,
+			Data:        data,
+			Size:        size,
+			ExpiresAt:   time.Now().Add(sc.defaultTTL),
 			AccessCount: 1,
-		})
-		sc.l1[key] = &L1Entry{
-			Key:       key,
-			Data:      data,
-			Size:      size,
-			ExpiresAt: time.Now().Add(sc.defaultTTL),
-			AccessCount: 1,
-			LLElem:    elem,
 		}
+		elem := sc.l1List.PushFront(newEntry)
+		newEntry.LLElem = elem
+		sc.l1[key] = newEntry
+		sc.l1Size += size
 	}
-
-	sc.l1Size += size
 }
 
 func (sc *SegmentCache) deleteL1(key string) {
@@ -396,8 +395,13 @@ func (sc *SegmentCache) cleanupLoop() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		sc.cleanupExpired()
+	for {
+		select {
+		case <-sc.done:
+			return
+		case <-ticker.C:
+			sc.cleanupExpired()
+		}
 	}
 }
 
@@ -480,6 +484,14 @@ type SegmentCacheStats struct {
 
 // Close releases cache resources
 func (sc *SegmentCache) Close() error {
+	// Signal cleanup goroutine to stop
+	select {
+	case <-sc.done:
+		// Already closed
+	default:
+		close(sc.done)
+	}
+
 	// Clear L1
 	sc.l1Mu.Lock()
 	sc.l1 = make(map[string]*L1Entry)

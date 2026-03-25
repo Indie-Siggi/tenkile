@@ -89,6 +89,7 @@ type DevicePlaybackStats struct {
 	ConsecutiveFailures   int64                `json:"consecutive_failures"`
 	OutcomeCounts        map[string]int64     `json:"outcome_counts"`
 	CodecStats           map[string]CodecStats `json:"codec_stats"`
+	FirstSeen            time.Time            `json:"first_seen"`
 	LastPlayback         time.Time            `json:"last_playback"`
 	LastSuccess          time.Time            `json:"last_success"`
 	LastFailure          time.Time            `json:"last_failure"`
@@ -192,13 +193,11 @@ func (fm *FeedbackManager) SetOnReProbeRequired(callback func(deviceID string, r
 // RecordSuccess records a successful playback
 func (fm *FeedbackManager) RecordSuccess(feedback PlaybackFeedback) {
 	feedback.Outcome = OutcomeSuccess
-	feedback.Timestamp = time.Now()
 	fm.recordFeedback(feedback)
 }
 
 // RecordFailure records a failed playback
 func (fm *FeedbackManager) RecordFailure(feedback PlaybackFeedback) {
-	feedback.Timestamp = time.Now()
 	fm.recordFeedback(feedback)
 }
 
@@ -207,6 +206,9 @@ func (fm *FeedbackManager) recordFeedback(feedback PlaybackFeedback) {
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
 
+	// Set timestamp under lock to avoid race
+	feedback.Timestamp = time.Now()
+
 	// Initialize device if not exists
 	if _, ok := fm.events[feedback.DeviceID]; !ok {
 		fm.events[feedback.DeviceID] = []PlaybackEvent{}
@@ -214,6 +216,7 @@ func (fm *FeedbackManager) recordFeedback(feedback PlaybackFeedback) {
 			DeviceID:      feedback.DeviceID,
 			OutcomeCounts: make(map[string]int64),
 			CodecStats:    make(map[string]CodecStats),
+			FirstSeen:     feedback.Timestamp,
 		}
 	}
 
@@ -382,10 +385,8 @@ func (fm *FeedbackManager) updateStats(feedback PlaybackFeedback, trustDelta flo
 		stats.SuccessRate = float64(stats.SuccessfulPlaybacks) / float64(stats.TotalPlaybacks)
 	}
 
-	// Update trust delta
+	// Update trust delta, clamping after each addition
 	stats.CurrentTrustDelta += trustDelta
-
-	// Clamp trust delta
 	if stats.CurrentTrustDelta > fm.trustConfig.MaxTrust {
 		stats.CurrentTrustDelta = fm.trustConfig.MaxTrust
 	}
@@ -393,11 +394,14 @@ func (fm *FeedbackManager) updateStats(feedback PlaybackFeedback, trustDelta flo
 		stats.CurrentTrustDelta = fm.trustConfig.MinTrust
 	}
 
-	// Check for success streak bonus
+	// Check for success streak bonus, clamping after addition
 	if stats.ConsecutiveSuccesses >= int64(fm.trustConfig.SuccessStreakThreshold) {
 		stats.CurrentTrustDelta += fm.trustConfig.SuccessStreakBonus
 		if stats.CurrentTrustDelta > fm.trustConfig.MaxTrust {
 			stats.CurrentTrustDelta = fm.trustConfig.MaxTrust
+		}
+		if stats.CurrentTrustDelta < fm.trustConfig.MinTrust {
+			stats.CurrentTrustDelta = fm.trustConfig.MinTrust
 		}
 	}
 }
@@ -590,6 +594,15 @@ func (fm *FeedbackManager) GetTrustAdjustment(deviceID string) float64 {
 	return stats.CurrentTrustDelta
 }
 
+// setTrustDelta sets the trust delta for a device (used by decay loop)
+func (fm *FeedbackManager) setTrustDelta(deviceID string, delta float64) {
+	fm.mu.Lock()
+	defer fm.mu.Unlock()
+	if stats, ok := fm.stats[deviceID]; ok {
+		stats.CurrentTrustDelta = delta
+	}
+}
+
 // ResetTrustAdjustment resets the trust adjustment for a device
 func (fm *FeedbackManager) ResetTrustAdjustment(deviceID string) {
 	fm.mu.Lock()
@@ -638,12 +651,17 @@ func (fm *FeedbackManager) GetGlobalStats() map[string]interface{} {
 		}
 	}
 
+	var globalSuccessRate float64
+	if totalPlaybacks > 0 {
+		globalSuccessRate = float64(totalSuccesses) / float64(totalPlaybacks)
+	}
+
 	return map[string]interface{}{
 		"total_devices":          len(fm.stats),
 		"total_playbacks":        totalPlaybacks,
 		"total_successes":       totalSuccesses,
 		"total_failures":        totalFailures,
-		"global_success_rate":    float64(totalSuccesses) / float64(totalPlaybacks),
+		"global_success_rate":    globalSuccessRate,
 		"devices_needing_reprobe": devicesNeedingReProbe,
 		"outcome_totals":        outcomeTotals,
 	}

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -70,6 +71,8 @@ type TrustComponent struct {
 
 // TrustResolver calculates and manages device trust scores
 type TrustResolver struct {
+	mu sync.RWMutex
+
 	// Configuration
 	MaxScore           float64
 	MinScore           float64
@@ -206,14 +209,18 @@ func (tr *TrustResolver) CalculateTrustScore(data *DeviceTrustData) *TrustScore 
 	totalScore += behaviorScore * behaviorWeight
 	totalWeight += behaviorWeight
 
-	// Apply bonuses
+	// Apply bonuses as weighted components before normalization
 	reason := "Base trust score"
 	if data.IsVerified {
-		totalScore += tr.VerificationBonus
+		bonusWeight := 0.10
+		totalScore += 1.0 * bonusWeight // Full score for verified bonus
+		totalWeight += bonusWeight
 		reason += "; verified device bonus"
 	}
 	if data.IsCurated {
-		totalScore += tr.CurationBonus
+		bonusWeight := 0.10
+		totalScore += 1.0 * bonusWeight // Full score for curated bonus
+		totalWeight += bonusWeight
 		reason += "; curated device bonus"
 	}
 
@@ -248,7 +255,10 @@ func (tr *TrustResolver) evaluateFingerprint(data *DeviceTrustData) (float64, st
 	fingerprint := tr.generateFingerprint(data)
 
 	// Check if device is known
-	if tr.knownDevices[fingerprint] {
+	tr.mu.RLock()
+	known := tr.knownDevices[fingerprint]
+	tr.mu.RUnlock()
+	if known {
 		return 0.8, "Recognized device fingerprint"
 	}
 
@@ -452,11 +462,16 @@ func clamp(value, min, max float64) float64 {
 
 // cacheScore stores a trust score in the cache
 func (tr *TrustResolver) cacheScore(score *TrustScore) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 	tr.scoreCache[score.DeviceID] = score
 }
 
 // GetCachedScore retrieves a cached trust score
 func (tr *TrustResolver) GetCachedScore(deviceID string) (*TrustScore, bool) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+
 	score, ok := tr.scoreCache[deviceID]
 	if !ok {
 		return nil, false
@@ -473,11 +488,15 @@ func (tr *TrustResolver) GetCachedScore(deviceID string) (*TrustScore, bool) {
 
 // InvalidateCache removes a device from the cache
 func (tr *TrustResolver) InvalidateCache(deviceID string) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 	delete(tr.scoreCache, deviceID)
 }
 
 // CleanCache removes expired entries
 func (tr *TrustResolver) CleanCache() {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 	now := time.Now()
 	for deviceID, score := range tr.scoreCache {
 		if now.Sub(score.LastCalculated) > tr.cacheTTL {
@@ -488,6 +507,8 @@ func (tr *TrustResolver) CleanCache() {
 
 // RegisterKnownDevice marks a device fingerprint as known
 func (tr *TrustResolver) RegisterKnownDevice(fingerprint string) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 	tr.knownDevices[fingerprint] = true
 }
 

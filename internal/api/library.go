@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -66,6 +67,10 @@ func (h *LibraryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		LibraryType:            req.LibraryType,
 		Enabled:                req.Enabled,
 		RefreshIntervalMinutes: req.RefreshIntervalMinutes,
+	}
+	if lib.RefreshIntervalMinutes < 0 {
+		WriteError(w, http.StatusBadRequest, "refresh_interval_minutes must be non-negative")
+		return
 	}
 	if lib.RefreshIntervalMinutes == 0 {
 		lib.RefreshIntervalMinutes = 60
@@ -166,9 +171,10 @@ func (h *LibraryHandler) Scan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start scan in background
+	// Start scan in background with timeout
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+		defer cancel()
 		h.scanner.ScanLibrary(ctx, lib)
 		h.store.UpdateLibraryScanTime(ctx, lib.ID, time.Now())
 	}()
@@ -194,11 +200,28 @@ func (h *LibraryHandler) ScanStatus(w http.ResponseWriter, r *http.Request) {
 // ListItems handles GET /libraries/{libraryId}/items
 func (h *LibraryHandler) ListItems(w http.ResponseWriter, r *http.Request) {
 	libraryID := chi.URLParam(r, "libraryId")
-	
-	// Pagination
+
+	// Pagination - parse from query params with validation
 	offset := 0
 	limit := 50
-	
+
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+			offset = v
+		} else {
+			WriteError(w, http.StatusBadRequest, "Invalid offset parameter: must be a non-negative integer")
+			return
+		}
+	}
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 200 {
+			limit = v
+		} else {
+			WriteError(w, http.StatusBadRequest, "Invalid limit parameter: must be between 1 and 200")
+			return
+		}
+	}
+
 	items, total, err := h.store.GetLibraryItems(r.Context(), libraryID, offset, limit)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "Failed to get items")

@@ -157,6 +157,9 @@ func (cd *CuratedDatabase) MatchDevice(deviceName string, platform string, limit
 		}
 
 		if score > 0 {
+			if score > 100 {
+				score = 100
+			}
 			result.Score = score
 			results = append(results, result)
 		}
@@ -243,6 +246,11 @@ func (cd *CuratedDatabase) calculateVersionMatch(input string, device *CuratedDe
 		}
 	}
 
+	// Cap score at 100 to keep it in [0,100] range
+	if score > 100 {
+		score = 100
+	}
+
 	if score >= 80 {
 		matchType = "version"
 	} else if score >= 50 {
@@ -279,6 +287,9 @@ func calculateStringSimilarity(a, b string) float64 {
 		}
 	}
 
+	if len(aBigrams)+len(bBigrams) == 0 {
+		return 0.0
+	}
 	dice := 2.0 * float64(common) / float64(len(aBigrams)+len(bBigrams))
 	return dice
 }

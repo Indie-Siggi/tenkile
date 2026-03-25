@@ -284,10 +284,21 @@ func InferCapabilitiesFromSoC(socName string, year int) *DeviceCapabilities {
 		return nil
 	}
 
+	// Derive MaxWidth/MaxHeight from MaxRes (which represents vertical resolution)
+	maxHeight := caps.MaxRes
+	maxWidth := maxHeight * 16 / 9 // Assume 16:9 aspect ratio
+	if maxHeight >= 4320 {
+		maxWidth = 7680 // 8K
+	} else if maxHeight >= 2160 {
+		maxWidth = 3840 // 4K
+	} else if maxHeight >= 1080 {
+		maxWidth = 1920 // Full HD
+	}
+
 	capabilities := &DeviceCapabilities{
 		VideoCodecs:      caps.VideoCodecs,
-		MaxWidth:         3840,
-		MaxHeight:        caps.MaxRes,
+		MaxWidth:         maxWidth,
+		MaxHeight:        maxHeight,
 		MaxBitrate:       caps.MaxBitrate,
 		SupportsHDR:      len(caps.HDR) > 0,
 		SupportsDolbyVision: caps.DolbyVision,

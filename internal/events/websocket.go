@@ -239,6 +239,9 @@ func (h *WebSocketHub) ClientCount() int {
 // readPump pumps messages from the WebSocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("readPump panic recovered: %v", r)
+		}
 		c.hub.unsubscribe <- c
 		c.conn.Close()
 	}()
@@ -313,7 +316,11 @@ func (c *Client) handleMessage(message []byte) {
 func (c *Client) writePump() {
 	ticker := time.NewTicker(54 * time.Second)
 	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("writePump panic recovered: %v", r)
+		}
 		ticker.Stop()
+		c.hub.unsubscribe <- c
 		c.conn.Close()
 	}()
 

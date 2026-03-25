@@ -63,28 +63,30 @@ func (a *FFmpegArgs) Build(inputPath, outputPath string) []string {
 }
 
 // BuildFFmpegArgs constructs FFmpeg arguments from a PlaybackDecision.
-func BuildFFmpegArgs(decision *PlaybackDecision, encoder *server.EncoderCapability, policy QualityPreservationPolicy) *FFmpegArgs {
+func BuildFFmpegArgs(decision *PlaybackDecision, encoder *server.EncoderCapability, policy QualityPreservationPolicy) (*FFmpegArgs, error) {
 	args := &FFmpegArgs{}
 
 	if decision.Type == DecisionDirectPlay {
-		return nil // No FFmpeg needed
+		return nil, nil // No FFmpeg needed
 	}
 
 	if decision.Type == DecisionRemux {
 		// Remux: copy streams, change container only
 		args.OutputFormat = decision.TargetContainer
-		return args
+		return args, nil
 	}
 
 	// Transcode
 	buildVideoArgs(args, decision, encoder, policy)
 	buildAudioArgs(args, decision)
-	buildSubtitleArgs(args, decision)
+	if err := buildSubtitleArgs(args, decision); err != nil {
+		return nil, fmt.Errorf("build subtitle args: %w", err)
+	}
 
 	// Output format
 	args.OutputFormat = mapContainerToFFmpegFormat(decision.TargetContainer)
 
-	return args
+	return args, nil
 }
 
 func buildVideoArgs(args *FFmpegArgs, decision *PlaybackDecision, encoder *server.EncoderCapability, policy QualityPreservationPolicy) {
@@ -211,8 +213,14 @@ func buildAudioArgs(args *FFmpegArgs, decision *PlaybackDecision) {
 	}
 }
 
-func buildSubtitleArgs(args *FFmpegArgs, decision *PlaybackDecision) {
+func buildSubtitleArgs(args *FFmpegArgs, decision *PlaybackDecision) error {
 	if decision.SubtitleDecision.Action == SubtitleBurnIn {
+		// Validate streamIndex is a non-negative integer before interpolation
+		// to prevent command injection via crafted stream index values.
+		if decision.SubtitleDecision.streamIndex < 0 {
+			return fmt.Errorf("invalid subtitle stream index: %d (must be non-negative)", decision.SubtitleDecision.streamIndex)
+		}
+
 		// Add subtitle overlay filter to burn subtitles into video.
 		// For graphical subs (PGS/VOBSUB), use overlay filter via filter_complex.
 		// For text/styled subs (ASS/SRT), use the subtitles filter.
@@ -230,6 +238,7 @@ func buildSubtitleArgs(args *FFmpegArgs, decision *PlaybackDecision) {
 	} else {
 		args.SubtitleArgs = append(args.SubtitleArgs, "-sn") // Strip subtitles from output
 	}
+	return nil
 }
 
 func addEncoderPreset(args *FFmpegArgs, encoder *server.EncoderCapability) {

@@ -11,13 +11,6 @@ export default function Library({ id }) {
   const [total, setTotal] = useState(0);
   const limit = 50;
 
-  useEffect(() => {
-    if (id) {
-      loadLibrary();
-      loadItems();
-    }
-  }, [id, offset]);
-
   const loadLibrary = async () => {
     try {
       const data = await fetchLibrary(id);
@@ -35,11 +28,19 @@ export default function Library({ id }) {
       setTotal(data.total || 0);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to load items');
+      console.error('Failed to load library items:', err);
+      setError('Unable to load library items. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (id) {
+      loadLibrary();
+      loadItems();
+    }
+  }, [id, offset]);
 
   const handlePlay = (itemId) => {
     route(`/play/${itemId}`);

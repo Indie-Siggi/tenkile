@@ -20,7 +20,8 @@ export default function Dashboard() {
       setLibraries(data.libraries || []);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to load libraries');
+      console.error('Failed to load libraries:', err);
+      setError('Unable to load libraries. Please try again later.');
     } finally {
       setLoading(false);
     }

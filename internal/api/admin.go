@@ -859,7 +859,15 @@ func (h *AdminHandlers) handleVoteCuratedDevice(w http.ResponseWriter, r *http.R
 	}
 
 	// Get updated device
-	device, _ := h.curatedDB.GetByID(deviceID)
+	device, ok := h.curatedDB.GetByID(deviceID)
+	if !ok || device == nil {
+		RespondJSON(w, http.StatusOK, map[string]interface{}{
+			"success":   true,
+			"device_id": deviceID,
+			"message":   "Vote recorded",
+		})
+		return
+	}
 
 	RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"success":   true,

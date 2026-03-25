@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/tenkile/tenkile/internal/probes"
@@ -491,9 +492,19 @@ func (h *PlaybackHandlers) handleTranscodeRecommendation(w http.ResponseWriter, 
 		SubtitleMethod:   "embed",
 	}
 
+	// Normalize codec names to lowercase before comparison
+	normalizedVideoCodecs := make([]string, len(caps.VideoCodecs))
+	for i, vc := range caps.VideoCodecs {
+		normalizedVideoCodecs[i] = strings.ToLower(strings.TrimSpace(vc))
+	}
+	normalizedAudioCodecs := make([]string, len(caps.AudioCodecs))
+	for i, ac := range caps.AudioCodecs {
+		normalizedAudioCodecs[i] = strings.ToLower(strings.TrimSpace(ac))
+	}
+
 	for _, target := range []string{"h264", "hevc", "vp9", "av1"} {
-		for _, vc := range caps.VideoCodecs {
-			if codec.Equal(vc, target) {
+		for _, vc := range normalizedVideoCodecs {
+			if vc == target {
 				options.TargetVideoCodec = target
 				break
 			}
@@ -501,8 +512,8 @@ func (h *PlaybackHandlers) handleTranscodeRecommendation(w http.ResponseWriter, 
 	}
 
 	for _, target := range []string{"aac", "mp3", "ac3", "eac3", "opus"} {
-		for _, ac := range caps.AudioCodecs {
-			if codec.Equal(ac, target) {
+		for _, ac := range normalizedAudioCodecs {
+			if ac == target {
 				options.TargetAudioCodec = target
 				break
 			}

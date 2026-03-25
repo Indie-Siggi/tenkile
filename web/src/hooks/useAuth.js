@@ -1,21 +1,83 @@
-import { signal } from '@preact/signals';
+import { signal, effect } from '@preact/signals';
 
 const API_BASE = '/api/v1';
 
-// Auth state signals
+// Auth state signals — single source of truth (in-memory).
+// sessionStorage is used as fallback persistence (cleared on tab close).
 export const authState = {
-  token: signal(localStorage.getItem('token') || null),
-  user: signal(JSON.parse(localStorage.getItem('user') || 'null')),
-  isAuthenticated: signal(!!localStorage.getItem('token')),
+  token: signal(null),
+  refreshTokenValue: signal(null),
+  user: signal(null),
+  isAuthenticated: signal(false),
 };
 
+// Load from sessionStorage only once at init
+function _initFromStorage() {
+  try {
+    const token = sessionStorage.getItem('token');
+    const refresh = sessionStorage.getItem('refreshToken');
+    const user = JSON.parse(sessionStorage.getItem('user') || 'null');
+    authState.token.value = token;
+    authState.refreshTokenValue.value = refresh;
+    authState.user.value = user;
+    authState.isAuthenticated.value = !!token;
+  } catch {
+    // Storage unavailable or corrupt — start unauthenticated
+    clearAuthState();
+  }
+}
+
+// Sync signals TO sessionStorage whenever they change
+effect(() => {
+  const token = authState.token.value;
+  const refresh = authState.refreshTokenValue.value;
+  const user = authState.user.value;
+  try {
+    if (token) {
+      sessionStorage.setItem('token', token);
+    } else {
+      sessionStorage.removeItem('token');
+    }
+    if (refresh) {
+      sessionStorage.setItem('refreshToken', refresh);
+    } else {
+      sessionStorage.removeItem('refreshToken');
+    }
+    if (user) {
+      sessionStorage.setItem('user', JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem('user');
+    }
+  } catch {
+    // Storage unavailable — tokens remain in memory only
+  }
+});
+
+function clearAuthState() {
+  authState.token.value = null;
+  authState.refreshTokenValue.value = null;
+  authState.user.value = null;
+  authState.isAuthenticated.value = false;
+}
+
+// Migrate any tokens from localStorage (one-time cleanup) then init
 export function loadAuthFromStorage() {
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
-  
-  authState.token.value = token;
-  authState.user.value = user;
-  authState.isAuthenticated.value = !!token;
+  try {
+    // Migrate old localStorage tokens to sessionStorage, then remove
+    const oldToken = localStorage.getItem('token');
+    if (oldToken) {
+      sessionStorage.setItem('token', oldToken);
+      sessionStorage.setItem('refreshToken', localStorage.getItem('refreshToken') || '');
+      const oldUser = localStorage.getItem('user');
+      if (oldUser) sessionStorage.setItem('user', oldUser);
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    }
+  } catch {
+    // Ignore migration errors
+  }
+  _initFromStorage();
 }
 
 export async function login(username, password) {
@@ -33,14 +95,10 @@ export async function login(username, password) {
   }
 
   const data = await response.json();
-  
-  // Store auth data
-  localStorage.setItem('token', data.access_token);
-  localStorage.setItem('refreshToken', data.refresh_token);
-  localStorage.setItem('user', JSON.stringify(data.user));
 
-  // Update signals
+  // Update signals (effect syncs to sessionStorage automatically)
   authState.token.value = data.access_token;
+  authState.refreshTokenValue.value = data.refresh_token;
   authState.user.value = data.user;
   authState.isAuthenticated.value = true;
 
@@ -48,26 +106,23 @@ export async function login(username, password) {
 }
 
 export async function logout() {
+  const token = authState.token.value;
   try {
-    await fetch(`${API_BASE}/auth/logout`, {
+    const response = await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${authState.token.value}`,
+        'Authorization': `Bearer ${token}`,
       },
     });
+    if (!response.ok) {
+      console.warn('Server logout failed (status ' + response.status + '). Local session cleared.');
+    }
   } catch (e) {
-    // Ignore logout errors
+    console.warn('Server logout request failed. Local session cleared.');
   }
 
-  // Clear stored auth
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
-
-  // Update signals
-  authState.token.value = null;
-  authState.user.value = null;
-  authState.isAuthenticated.value = false;
+  // Always clear local state so user is not stuck logged in
+  clearAuthState();
 }
 
 export async function getCurrentUser() {
@@ -85,8 +140,8 @@ export async function getCurrentUser() {
 }
 
 export async function refreshToken() {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) {
+  const refresh = authState.refreshTokenValue.value;
+  if (!refresh) {
     throw new Error('No refresh token');
   }
 
@@ -95,17 +150,19 @@ export async function refreshToken() {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    body: JSON.stringify({ refresh_token: refresh }),
   });
 
   if (!response.ok) {
-    logout();
+    clearAuthState();
     throw new Error('Token refresh failed');
   }
 
   const data = await response.json();
-  localStorage.setItem('token', data.access_token);
   authState.token.value = data.access_token;
+  if (data.refresh_token) {
+    authState.refreshTokenValue.value = data.refresh_token;
+  }
 
   return data.access_token;
 }

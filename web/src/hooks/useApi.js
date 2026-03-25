@@ -1,4 +1,4 @@
-import { authState } from './useAuth.js';
+import { authState, refreshToken as doRefreshToken } from './useAuth.js';
 
 const API_BASE = '/api/v1';
 
@@ -10,30 +10,11 @@ class ApiError extends Error {
   }
 }
 
-async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
+// Guard to prevent concurrent refresh attempts
+let _refreshPromise = null;
 
-  // Add auth token if available
-  const token = authState.token.value;
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  // Handle unauthorized
-  if (response.status === 401) {
-    // Could trigger token refresh here
-    throw new ApiError('Unauthorized', 401, null);
-  }
+async function _performRequest(url, options, headers) {
+  const response = await fetch(url, { ...options, headers });
 
   // Parse response
   const contentType = response.headers.get('content-type');
@@ -50,6 +31,45 @@ async function request(endpoint, options = {}) {
   }
 
   return data;
+}
+
+async function request(endpoint, options = {}) {
+  const url = `${API_BASE}${endpoint}`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  // Add auth token if available
+  const token = authState.token.value;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    return await _performRequest(url, options, headers);
+  } catch (err) {
+    // On 401, attempt a single token refresh and retry
+    if (err instanceof ApiError && err.status === 401 && authState.token.value) {
+      try {
+        // Coalesce concurrent refresh attempts
+        if (!_refreshPromise) {
+          _refreshPromise = doRefreshToken().finally(() => { _refreshPromise = null; });
+        }
+        const newToken = await _refreshPromise;
+
+        // Retry with fresh token
+        const retryHeaders = { ...headers, 'Authorization': `Bearer ${newToken}` };
+        return await _performRequest(url, options, retryHeaders);
+      } catch {
+        // Refresh failed — redirect to login
+        window.location.href = '/login';
+        throw new ApiError('Session expired. Please log in again.', 401, null);
+      }
+    }
+    throw err;
+  }
 }
 
 // GET request

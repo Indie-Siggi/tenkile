@@ -166,7 +166,11 @@ func (fi *FeedbackIntegration) SetOnTrustUpdate(callback func(deviceID string, o
 
 // GetEffectiveTrustScore calculates the effective trust score for a device
 func (fi *FeedbackIntegration) GetEffectiveTrustScore(deviceID string) float64 {
-	if !fi.config.Enabled {
+	fi.mu.RLock()
+	enabled := fi.config.Enabled
+	fi.mu.RUnlock()
+
+	if !enabled {
 		return 1.0 // Default to full trust when disabled
 	}
 
@@ -387,25 +391,26 @@ func (fi *FeedbackIntegration) runDecay() {
 	for deviceID, deviceStats := range stats {
 		if deviceStats.CurrentTrustDelta != 0 {
 			// Decay the adjustment
-			newDelta := deviceStats.CurrentTrustDelta
-			if deviceStats.CurrentTrustDelta > 0 {
-				newDelta = deviceStats.CurrentTrustDelta * (1 - decayRate)
+			oldDelta := deviceStats.CurrentTrustDelta
+			newDelta := oldDelta
+			if oldDelta > 0 {
+				newDelta = oldDelta * (1 - decayRate)
 				if newDelta < 0.01 {
 					newDelta = 0
 				}
 			} else {
-				newDelta = deviceStats.CurrentTrustDelta * (1 - decayRate)
+				newDelta = oldDelta * (1 - decayRate)
 				if newDelta > -0.01 {
 					newDelta = 0
 				}
 			}
 
-			if newDelta != deviceStats.CurrentTrustDelta {
-				// Assign the decayed value back
-				deviceStats.CurrentTrustDelta = newDelta
+			if newDelta != oldDelta {
+				// Write the decayed value back to the actual stats
+				fi.feedbackManager.setTrustDelta(deviceID, newDelta)
 				slog.Debug("Applying trust decay",
 					"device_id", deviceID,
-					"old_delta", newDelta/decayRate,
+					"old_delta", oldDelta,
 					"new_delta", newDelta)
 			}
 		}
@@ -424,8 +429,8 @@ func (fi *FeedbackIntegration) GracePeriodChecker(deviceID string) bool {
 	}
 
 	// Check if first playback was within grace period
-	timeSinceFirstPlayback := time.Since(stats.LastPlayback)
-	return timeSinceFirstPlayback < fi.config.GracePeriod
+	timeSinceFirstSeen := time.Since(stats.FirstSeen)
+	return timeSinceFirstSeen < fi.config.GracePeriod
 }
 
 // ResetDeviceTrust resets all trust data for a device

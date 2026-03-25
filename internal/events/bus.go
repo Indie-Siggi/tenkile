@@ -40,14 +40,6 @@ func (b *EventBus) Subscribe(topic string, ch chan *Event) func() {
 	}
 	b.subscribers[topic][ch] = true
 
-	// Also subscribe to "all" for wildcard listeners
-	if topic != TopicAll {
-		if b.subscribers[TopicAll] == nil {
-			b.subscribers[TopicAll] = make(map[chan *Event]bool)
-		}
-		b.subscribers[TopicAll][ch] = true
-	}
-
 	return func() {
 		b.Unsubscribe(topic, ch)
 	}
@@ -62,14 +54,6 @@ func (b *EventBus) Unsubscribe(topic string, ch chan *Event) {
 		delete(subs, ch)
 		if len(subs) == 0 {
 			delete(b.subscribers, topic)
-		}
-	}
-
-	// Also remove from "all"
-	if subs := b.subscribers[TopicAll]; subs != nil {
-		delete(subs, ch)
-		if len(subs) == 0 {
-			delete(b.subscribers, TopicAll)
 		}
 	}
 }
@@ -170,7 +154,10 @@ func SetBus(bus *EventBus) {
 // randomString generates a random hex string of the given length
 func randomString(n int) string {
 	bytes := make([]byte, n/2+1)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return fmt.Sprintf("%x", time.Now().UnixNano())[:n]
+	}
 	return hex.EncodeToString(bytes)[:n]
 }
 

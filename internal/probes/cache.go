@@ -166,15 +166,17 @@ func (c *CapabilityCache) GetWithContext(ctx context.Context, deviceID string) (
 	}
 
 	// Check memory cache first
-	c.mu.RLock()
+	c.mu.Lock()
 	cached, found := c.memoryCache[deviceID]
-	c.mu.RUnlock()
-
 	if found && !c.isExpired(cached) {
+		cached.AccessCount++
+		cached.LastAccessed = time.Now()
+		caps := cached.Capabilities
+		c.mu.Unlock()
 		c.recordHit()
-		c.updateAccess(cached)
-		return cached.Capabilities, true
+		return caps, true
 	}
+	c.mu.Unlock()
 
 	// Fall back to SQLite
 	if c.enableSQLite && c.db != nil {

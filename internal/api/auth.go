@@ -284,8 +284,16 @@ func (h *AuthHandler) FirstRun(w http.ResponseWriter, r *http.Request) {
 	})
 
 	user := &User{ID: userID, Username: req.Username, Role: "admin"}
-	accessToken, _ := h.generateToken(user, h.jwtExpiry)
-	refreshToken, _ := h.generateToken(user, 7*24*time.Hour)
+	accessToken, err := h.generateToken(user, h.jwtExpiry)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "Failed to generate access token")
+		return
+	}
+	refreshToken, err := h.generateToken(user, 7*24*time.Hour)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "Failed to generate refresh token")
+		return
+	}
 
 	WriteJSON(w, http.StatusCreated, map[string]interface{}{
 		"access_token":  accessToken,

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tenkile/tenkile/pkg/codec"
@@ -68,7 +69,8 @@ type Validator struct {
 	// Known platform constraints
 	PlatformConstraints map[string]*PlatformConstraints
 
-	// Anomaly tracking
+	// Anomaly tracking (protected by mu)
+	mu             sync.Mutex
 	anomalyHistory map[string][]AnomalyRecord
 
 	// Configuration
@@ -696,6 +698,9 @@ func (v *Validator) checkAnomalies(caps *DeviceCapabilities, result *ValidationR
 
 // recordAnomaly records an anomaly for a device
 func (v *Validator) recordAnomaly(deviceID, anomalyType, description, severity string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	history := v.anomalyHistory[deviceID]
 
 	// Find existing record
@@ -761,11 +766,19 @@ func (v *Validator) calculateScore(result *ValidationResult) float64 {
 
 // GetAnomalyHistory returns anomaly history for a device
 func (v *Validator) GetAnomalyHistory(deviceID string) []AnomalyRecord {
-	return v.anomalyHistory[deviceID]
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	history := v.anomalyHistory[deviceID]
+	// Return a copy to avoid races on the returned slice
+	result := make([]AnomalyRecord, len(history))
+	copy(result, history)
+	return result
 }
 
 // ClearAnomalyHistory clears anomaly history for a device
 func (v *Validator) ClearAnomalyHistory(deviceID string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	delete(v.anomalyHistory, deviceID)
 }
 

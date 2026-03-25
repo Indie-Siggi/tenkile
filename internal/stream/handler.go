@@ -2,10 +2,13 @@ package stream
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,12 +79,17 @@ func (h *Handler) cleanupExpiredSessions() {
 	threshold := time.Now().Add(-h.sessionTTL)
 	for id, session := range h.sessions {
 		if session.LastAccess.Before(threshold) {
-			// Clean up associated manifest files
-			if session.ManifestPath != "" {
-				dir := filepath.Dir(session.ManifestPath)
-				os.RemoveAll(dir)
-			}
+			// Copy ManifestPath while we hold the lock so no other goroutine can clear it
+			manifestPath := session.ManifestPath
 			delete(h.sessions, id)
+			// Clean up associated manifest files
+			if manifestPath != "" {
+				dir := filepath.Dir(manifestPath)
+				if err := os.RemoveAll(dir); err != nil {
+					// Log cleanup error but continue processing other sessions
+					fmt.Fprintf(os.Stderr, "stream: failed to remove session dir %s: %v\n", dir, err)
+				}
+			}
 		}
 	}
 }
@@ -119,7 +127,9 @@ func (h *Handler) cleanupOrphanedSegments() {
 			// Build full path and validate it's within temp directory
 			fullPath := filepath.Join(tempDir, name)
 			if isPathInDirectory(fullPath, tempDir) {
-				os.RemoveAll(fullPath)
+				if err := os.RemoveAll(fullPath); err != nil {
+					fmt.Fprintf(os.Stderr, "stream: failed to remove orphaned segment dir %s: %v\n", fullPath, err)
+				}
 			}
 		}
 	}
@@ -239,7 +249,11 @@ func (h *Handler) ServeHLS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a stream session
-	session, _ := h.StartSession(r.Context(), mediaItemID, "", "", variant, StreamTypeHLS)
+	session, err := h.StartSession(r.Context(), mediaItemID, "", "", variant, StreamTypeHLS)
+	if err != nil {
+		http.Error(w, "Failed to create stream session", http.StatusInternalServerError)
+		return
+	}
 	session.ManifestPath = manifest.MasterPlaylist
 
 	// FIX #5: Return URL like /api/v1/stream/hls/playlist?path=<encoded> not filesystem path
@@ -283,7 +297,11 @@ func (h *Handler) serveFallbackDirect(w http.ResponseWriter, r *http.Request, it
 
 	if directPlayable[ext] {
 		// Create session for direct playback
-		session, _ := h.StartSession(r.Context(), item.ID, "", "", variant, StreamTypeDirect)
+		session, err := h.StartSession(r.Context(), item.ID, "", "", variant, StreamTypeDirect)
+		if err != nil {
+			http.Error(w, "Failed to create stream session", http.StatusInternalServerError)
+			return
+		}
 		session.ManifestPath = item.Path
 
 		// Set appropriate content type
@@ -315,23 +333,41 @@ func (h *Handler) serveFallbackDirect(w http.ResponseWriter, r *http.Request, it
 	http.Error(w, "Transcoding unavailable and direct playback not supported for this format", http.StatusServiceUnavailable)
 }
 
-// ServeHLSManifest serves HLS playlist files
+// ServeHLSManifest serves HLS playlist files.
+// Prefer session_id query param for secure lookup; falls back to path with validation.
 func (h *Handler) ServeHLSManifest(w http.ResponseWriter, r *http.Request) {
-	// Extract path from URL
-	playlistPath := r.URL.Query().Get("path")
-	if playlistPath == "" {
-		http.Error(w, "Missing path", http.StatusBadRequest)
+	// Prefer session-based lookup to avoid exposing filesystem paths
+	if sessionID := r.URL.Query().Get("session_id"); sessionID != "" {
+		session, ok := h.GetSession(sessionID)
+		if !ok || session.ManifestPath == "" {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+		http.ServeFile(w, r, session.ManifestPath)
 		return
 	}
 
-	// Security: ensure path is within allowed directory
-	if !h.isPathAllowed(playlistPath) {
+	// Fallback: raw path (for backward compatibility)
+	playlistPath := r.URL.Query().Get("path")
+	if playlistPath == "" {
+		http.Error(w, "Missing path or session_id", http.StatusBadRequest)
+		return
+	}
+
+	// URL-decode the path before validation
+	decodedPath, err := url.QueryUnescape(playlistPath)
+	if err != nil {
+		http.Error(w, "Invalid path encoding", http.StatusBadRequest)
+		return
+	}
+
+	// Security: ensure decoded path is within allowed directory
+	if !h.isPathAllowed(decodedPath) {
 		http.Error(w, "Invalid path", http.StatusForbidden)
 		return
 	}
 
-	// FIX #6: Check if segments exist before serving - serve cached manifest
-	http.ServeFile(w, r, playlistPath)
+	http.ServeFile(w, r, decodedPath)
 }
 
 // ServeHLSSegment serves HLS segment files
@@ -342,13 +378,20 @@ func (h *Handler) ServeHLSSegment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Security: ensure path is within allowed directory
-	if !h.isPathAllowed(segmentPath) {
+	// URL-decode the path before validation
+	decodedPath, err := url.QueryUnescape(segmentPath)
+	if err != nil {
+		http.Error(w, "Invalid path encoding", http.StatusBadRequest)
+		return
+	}
+
+	// Security: ensure decoded path is within allowed directory
+	if !h.isPathAllowed(decodedPath) {
 		http.Error(w, "Invalid path", http.StatusForbidden)
 		return
 	}
 
-	http.ServeFile(w, r, segmentPath)
+	http.ServeFile(w, r, decodedPath)
 }
 
 // FIX #3: Strong path validation using filepath.EvalSymlinks() and existence check
@@ -439,10 +482,15 @@ func selectVariants(requestedVariant string) []Variant {
 	return selected
 }
 
-// FIX #1 & #9: StartSession with proper locking and field population
+// StartSession creates a new streaming session with a cryptographically random ID.
 func (h *Handler) StartSession(ctx context.Context, mediaItemID, userID, deviceID, variant string, streamType StreamType) (*StreamSession, error) {
+	// Generate a cryptographically random session ID to avoid collisions
+	idBytes := make([]byte, 16)
+	if _, err := rand.Read(idBytes); err != nil {
+		return nil, fmt.Errorf("generate session ID: %w", err)
+	}
 	session := &StreamSession{
-		ID:          fmt.Sprintf("session_%d", time.Now().UnixNano()),
+		ID:          "session_" + hex.EncodeToString(idBytes),
 		MediaItemID: mediaItemID,
 		UserID:      userID,
 		DeviceID:    deviceID,
@@ -467,31 +515,36 @@ func (h *Handler) SetSessionManifest(sessionID, manifestPath string) {
 	}
 }
 
-// FIX #1: GetSession with proper locking
+// GetSession retrieves a session and updates its last-access time atomically.
+// Uses a single Lock instead of RLock+Lock to avoid a TOCTOU race where the
+// session could be deleted between the two acquisitions.
 func (h *Handler) GetSession(id string) (*StreamSession, bool) {
-	h.mu.RLock()
+	h.mu.Lock()
 	session, ok := h.sessions[id]
-	h.mu.RUnlock()
-
 	if ok {
-		h.mu.Lock()
 		session.LastAccess = time.Now()
-		h.mu.Unlock()
 	}
+	h.mu.Unlock()
 	return session, ok
 }
 
-// FIX #1: EndSession with proper locking
+// EndSession removes a session and cleans up its files.
 func (h *Handler) EndSession(id string) {
 	h.mu.Lock()
 	session, ok := h.sessions[id]
-	if ok && session.ManifestPath != "" {
-		// Clean up manifest files
-		dir := filepath.Dir(session.ManifestPath)
-		os.RemoveAll(dir)
+	var manifestPath string
+	if ok {
+		manifestPath = session.ManifestPath
 	}
 	delete(h.sessions, id)
 	h.mu.Unlock()
+
+	if manifestPath != "" {
+		dir := filepath.Dir(manifestPath)
+		if err := os.RemoveAll(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "stream: failed to remove session dir %s: %v\n", dir, err)
+		}
+	}
 
 	// Publish stream ended event
 	if ok && session != nil {

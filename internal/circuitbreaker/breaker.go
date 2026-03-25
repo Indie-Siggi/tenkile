@@ -133,6 +133,10 @@ func (b *Breaker) Allow() error {
 		lastFailure := time.Unix(0, atomic.LoadInt64(&b.lastFailureTime))
 		if time.Since(lastFailure) > b.timeout {
 			b.toState(StateHalfOpen)
+			// Re-check state after transition — another goroutine may have changed it
+			if State(b.LoadState()) != StateHalfOpen {
+				return ErrCircuitOpen
+			}
 			return nil
 		}
 		return ErrCircuitOpen
@@ -162,6 +166,7 @@ func (b *Breaker) RecordSuccess() {
 	case StateHalfOpen:
 		successes := atomic.AddInt32(&b.successes, 1)
 		if successes >= b.successThreshold {
+			atomic.StoreInt32(&b.successes, 0)
 			b.toState(StateClosed)
 		}
 

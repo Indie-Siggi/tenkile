@@ -4,6 +4,8 @@ import (
     "context"
     "database/sql"
     "encoding/json"
+    "fmt"
+    "log/slog"
     "time"
 )
 
@@ -20,9 +22,18 @@ func NewStore(db *sql.DB) *Store {
 // SaveMediaItem saves or updates a media item
 func (s *Store) SaveMediaItem(ctx context.Context, item *MediaItem) error {
     // Marshal streams to JSON
-    videoJSON, _ := json.Marshal(item.VideoStream)
-    audioJSON, _ := json.Marshal(item.AudioStreams)
-    subtitleJSON, _ := json.Marshal(item.SubtitleStreams)
+    videoJSON, err := json.Marshal(item.VideoStream)
+    if err != nil {
+        return fmt.Errorf("failed to marshal video stream: %w", err)
+    }
+    audioJSON, err := json.Marshal(item.AudioStreams)
+    if err != nil {
+        return fmt.Errorf("failed to marshal audio streams: %w", err)
+    }
+    subtitleJSON, err := json.Marshal(item.SubtitleStreams)
+    if err != nil {
+        return fmt.Errorf("failed to marshal subtitle streams: %w", err)
+    }
 
     query := `
     INSERT INTO media_items (
@@ -53,7 +64,7 @@ func (s *Store) SaveMediaItem(ctx context.Context, item *MediaItem) error {
     }
     item.UpdatedAt = now
 
-    _, err := s.db.ExecContext(ctx, query,
+    _, err = s.db.ExecContext(ctx, query,
         item.ID, item.LibraryID, item.Path, item.Title, item.Year, item.Overview, item.PosterPath,
         string(videoJSON), string(audioJSON), string(subtitleJSON),
         item.Container, item.Duration, item.FileSize, item.FileModifiedAt, item.FileHash,
@@ -118,13 +129,19 @@ func (s *Store) GetMediaItem(ctx context.Context, id string) (*MediaItem, error)
 
     // Unmarshal JSON fields
     if videoJSON.Valid && videoJSON.String != "" && videoJSON.String != "null" {
-        json.Unmarshal([]byte(videoJSON.String), &item.VideoStream)
+        if err := json.Unmarshal([]byte(videoJSON.String), &item.VideoStream); err != nil {
+            slog.Warn("Failed to unmarshal video stream JSON", "id", item.ID, "error", err)
+        }
     }
     if audioJSON.Valid && audioJSON.String != "" && audioJSON.String != "null" {
-        json.Unmarshal([]byte(audioJSON.String), &item.AudioStreams)
+        if err := json.Unmarshal([]byte(audioJSON.String), &item.AudioStreams); err != nil {
+            slog.Warn("Failed to unmarshal audio streams JSON", "id", item.ID, "error", err)
+        }
     }
     if subtitleJSON.Valid && subtitleJSON.String != "" && subtitleJSON.String != "null" {
-        json.Unmarshal([]byte(subtitleJSON.String), &item.SubtitleStreams)
+        if err := json.Unmarshal([]byte(subtitleJSON.String), &item.SubtitleStreams); err != nil {
+            slog.Warn("Failed to unmarshal subtitle streams JSON", "id", item.ID, "error", err)
+        }
     }
 
     return &item, nil
@@ -132,6 +149,17 @@ func (s *Store) GetMediaItem(ctx context.Context, id string) (*MediaItem, error)
 
 // GetLibraryItems retrieves all items in a library with pagination
 func (s *Store) GetLibraryItems(ctx context.Context, libraryID string, offset, limit int) ([]*MediaItem, int, error) {
+    // Validate bounds
+    if offset < 0 {
+        offset = 0
+    }
+    if limit <= 0 {
+        limit = 50
+    }
+    if limit > 200 {
+        limit = 200
+    }
+
     // Get total count
     var total int
     err := s.db.QueryRowContext(ctx,
@@ -191,13 +219,19 @@ func (s *Store) GetLibraryItems(ctx context.Context, libraryID string, offset, l
         }
 
         if videoJSON.Valid && videoJSON.String != "" && videoJSON.String != "null" {
-            json.Unmarshal([]byte(videoJSON.String), &item.VideoStream)
+            if err := json.Unmarshal([]byte(videoJSON.String), &item.VideoStream); err != nil {
+                slog.Warn("Failed to unmarshal video stream JSON", "id", item.ID, "error", err)
+            }
         }
         if audioJSON.Valid && audioJSON.String != "" && audioJSON.String != "null" {
-            json.Unmarshal([]byte(audioJSON.String), &item.AudioStreams)
+            if err := json.Unmarshal([]byte(audioJSON.String), &item.AudioStreams); err != nil {
+                slog.Warn("Failed to unmarshal audio streams JSON", "id", item.ID, "error", err)
+            }
         }
         if subtitleJSON.Valid && subtitleJSON.String != "" && subtitleJSON.String != "null" {
-            json.Unmarshal([]byte(subtitleJSON.String), &item.SubtitleStreams)
+            if err := json.Unmarshal([]byte(subtitleJSON.String), &item.SubtitleStreams); err != nil {
+                slog.Warn("Failed to unmarshal subtitle streams JSON", "id", item.ID, "error", err)
+            }
         }
 
         items = append(items, &item)

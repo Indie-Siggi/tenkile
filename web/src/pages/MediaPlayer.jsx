@@ -3,9 +3,17 @@ import { route } from 'preact-router';
 import Hls from 'hls.js';
 import { fetchMediaItem, fetchHLSManifest } from '../hooks/useApi.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ALNUM_RE = /^[a-zA-Z0-9_-]+$/;
+
+function isValidId(value) {
+  return typeof value === 'string' && (UUID_RE.test(value) || ALNUM_RE.test(value));
+}
+
 export default function MediaPlayer({ id }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const safariListenerRef = useRef(null);
   
   const [mediaItem, setMediaItem] = useState(null);
   const [manifest, setManifest] = useState(null);
@@ -42,11 +50,16 @@ export default function MediaPlayer({ id }) {
       // Initialize HLS player
       if (manifestData?.manifest) {
         initializeHls(manifestData.manifest);
+      } else {
+        setError('No playable stream found for this media item.');
+        setLoading(false);
+        return;
       }
 
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to load media');
+      console.error('Failed to load media:', err);
+      setError('Unable to load media. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -65,6 +78,18 @@ export default function MediaPlayer({ id }) {
     } else if (!manifestUrl.startsWith('http')) {
       // For file paths from manifest, proxy through our API
       fullUrl = `/api/v1/stream/hls/playlist?path=${encodeURIComponent(manifestUrl)}`;
+    }
+
+    // Validate URL is same-origin to prevent loading from untrusted sources
+    try {
+      const parsed = new URL(fullUrl, window.location.origin);
+      if (parsed.origin !== window.location.origin) {
+        setError('Cannot load media from an external source.');
+        return;
+      }
+    } catch {
+      setError('Invalid media URL.');
+      return;
     }
 
     if (Hls.isSupported()) {
@@ -101,9 +126,11 @@ export default function MediaPlayer({ id }) {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (Safari)
       video.src = fullUrl;
-      video.addEventListener('loadedmetadata', () => {
+      const onLoadedMetadata = () => {
         video.play().catch(console.error);
-      });
+      };
+      safariListenerRef.current = onLoadedMetadata;
+      video.addEventListener('loadedmetadata', onLoadedMetadata);
     } else {
       setError('HLS is not supported in this browser');
     }
@@ -113,6 +140,11 @@ export default function MediaPlayer({ id }) {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
+    }
+    // Clean up Safari native HLS listener
+    if (safariListenerRef.current && videoRef.current) {
+      videoRef.current.removeEventListener('loadedmetadata', safariListenerRef.current);
+      safariListenerRef.current = null;
     }
   };
 
@@ -162,7 +194,12 @@ export default function MediaPlayer({ id }) {
 
   const handleBack = () => {
     destroyHls();
-    route(`/library/${mediaItem?.library_id || ''}`);
+    const libraryId = mediaItem?.library_id;
+    if (libraryId && isValidId(libraryId)) {
+      route(`/library/${libraryId}`);
+    } else {
+      route('/');
+    }
   };
 
   const formatTime = (seconds) => {

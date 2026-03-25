@@ -189,6 +189,12 @@ func (o *Orchestrator) Decide(ctx context.Context, item *MediaItem, deviceCaps *
 	}
 
 	// Step 1: Resolve subtitle decision FIRST (may force transcode)
+	// Validate subtitle index: must be >= -1 (-1 means no subtitle selected)
+	if item.SubtitleIndex < -1 {
+		decision.Reasons = append(decision.Reasons, fmt.Sprintf("invalid subtitle index %d, ignoring subtitles", item.SubtitleIndex))
+		item.SubtitleIndex = -1
+		item.SubtitleFormat = ""
+	}
 	deviceSupportsSub := containsCodec(deviceCaps.SubtitleFormats, item.SubtitleFormat)
 	decision.SubtitleDecision = DecideSubtitle(item.SubtitleFormat, deviceSupportsSub, o.subConfig)
 	decision.SubtitleDecision.streamIndex = item.SubtitleIndex
@@ -322,6 +328,11 @@ func (o *Orchestrator) buildTranscode(item *MediaItem, caps *probes.DeviceCapabi
 	videoCodec, videoReasons := o.selectVideoTarget(item, caps, selector)
 	decision.Reasons = append(decision.Reasons, videoReasons...)
 
+	if videoCodec == "" {
+		o.absoluteFallback(decision, "no usable video encoder found on server")
+		return
+	}
+
 	// Determine if we need HDR handling
 	needsHDR := false
 	needsToneMap := false
@@ -443,8 +454,8 @@ func (o *Orchestrator) selectVideoTarget(item *MediaItem, caps *probes.DeviceCap
 		return "h264", reasons
 	}
 
-	reasons = append(reasons, "no usable video encoder found")
-	return "h264", reasons
+	reasons = append(reasons, "no usable video encoder found, including h264")
+	return "", reasons
 }
 
 func (o *Orchestrator) selectAudioTarget(item *MediaItem, caps *probes.DeviceCapabilities, selector *server.EncoderSelector) (string, int, []string) {
@@ -484,7 +495,20 @@ func (o *Orchestrator) selectContainer(videoCodec, audioCodec string, caps *prob
 			return c
 		}
 	}
-	return "mp4" // Universal fallback
+
+	// Fallback to "mp4" only if the device supports it and it can contain our codecs
+	if containsCodec(caps.ContainerFormats, "mp4") &&
+		codec.CanContainerContain("mp4", videoCodec) &&
+		codec.CanContainerContain("mp4", audioCodec) {
+		return "mp4"
+	}
+
+	// Last resort: "ts" (MPEG-TS) works with nearly all video/audio combos
+	if codec.CanContainerContain("ts", videoCodec) && codec.CanContainerContain("ts", audioCodec) {
+		return "ts"
+	}
+
+	return "mp4" // Absolute fallback — best-effort
 }
 
 func (o *Orchestrator) findCompatibleContainer(caps *probes.DeviceCapabilities, videoCodec, audioCodec string) string {

@@ -632,7 +632,10 @@ func TestLegacy_AnamorphicDVD(t *testing.T) {
 
 func TestFFmpegArgs_DirectPlay(t *testing.T) {
 	decision := &PlaybackDecision{Type: DecisionDirectPlay}
-	args := BuildFFmpegArgs(decision, nil, DefaultQualityPolicy())
+	args, err := BuildFFmpegArgs(decision, nil, DefaultQualityPolicy())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if args != nil {
 		t.Error("direct play should not produce FFmpeg args")
 	}
@@ -654,7 +657,10 @@ func TestFFmpegArgs_ToneMapping_High(t *testing.T) {
 	policy := DefaultQualityPolicy()
 	policy.ToneMappingQuality = ToneMappingHigh
 
-	args := BuildFFmpegArgs(decision, encoder, policy)
+	args, err := BuildFFmpegArgs(decision, encoder, policy)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if args == nil {
 		t.Fatal("expected FFmpeg args for transcode")
 	}
@@ -701,7 +707,10 @@ func TestFFmpegArgs_HDRPassthrough(t *testing.T) {
 		SupportsHDRPassthrough: true,
 	}
 
-	args := BuildFFmpegArgs(decision, encoder, DefaultQualityPolicy())
+	args, err := BuildFFmpegArgs(decision, encoder, DefaultQualityPolicy())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if args == nil {
 		t.Fatal("expected FFmpeg args")
 	}

@@ -1,11 +1,15 @@
 package stream
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -18,10 +22,17 @@ type CommandRunner interface {
 // DefaultCommandRunner executes real FFmpeg commands
 type DefaultCommandRunner struct{}
 
-// FIX #4: FFmpeg stderr handling using CombinedOutput() or capture stderr properly
+// Run executes an FFmpeg command, capturing stdout and stderr separately.
+// Returns stdout on success; on failure, returns stderr in the error message.
 func (r *DefaultCommandRunner) Run(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-	return cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%w: stderr: %s", err, stderr.String())
+	}
+	return stdout.Bytes(), nil
 }
 
 // Segmenter handles HLS/DASH segment generation
@@ -49,6 +60,9 @@ func NewSegmenter(ffmpegPath, ffprobePath string, runner CommandRunner) *Segment
 		runner:      runner,
 	}
 }
+
+// validVariantName matches only alphanumeric chars and 'p' (e.g. "1080p", "720p", "4k").
+var validVariantName = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 
 // SetTempDir sets the temporary directory for segments
 func (s *Segmenter) SetTempDir(dir string) {
@@ -95,6 +109,25 @@ func (s *Segmenter) GenerateHLS(ctx context.Context, inputPath string, variants 
 	for _, variant := range variants {
 		variant := variant // Capture loop variable
 		go func() {
+			// Recover from panics so a single variant failure doesn't crash the process
+			defer func() {
+				if r := recover(); r != nil {
+					resultChan <- variantResult{err: fmt.Errorf("panic in variant %s: %v\n%s", variant.Name, r, debug.Stack())}
+				}
+			}()
+
+			// Check for context cancellation before starting work
+			if ctx.Err() != nil {
+				resultChan <- variantResult{err: ctx.Err()}
+				return
+			}
+
+			// Validate variant name to prevent path traversal via crafted names
+			if !validVariantName.MatchString(variant.Name) {
+				resultChan <- variantResult{err: fmt.Errorf("invalid variant name: %q", variant.Name)}
+				return
+			}
+
 			variantDir := filepath.Join(sessionDir, variant.Name)
 			if err := os.MkdirAll(variantDir, 0755); err != nil {
 				resultChan <- variantResult{err: fmt.Errorf("create variant dir: %w", err)}
@@ -192,12 +225,18 @@ func (s *Segmenter) writeMasterPlaylist(manifest *HLSManifest) error {
 	sb.WriteString("#EXT-X-VERSION:3\n")
 
 	for _, variant := range manifest.Variants {
+		// Validate variant name before writing to playlist
+		if !validVariantName.MatchString(variant.Name) {
+			return fmt.Errorf("invalid variant name in manifest: %q", variant.Name)
+		}
+
 		// Read variant playlist to get bandwidth
 		bandwidth := s.estimateBandwidth(variant.Name)
 
 		sb.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%s\n",
 			bandwidth, s.getResolution(variant.Name)))
-		sb.WriteString(filepath.Join(variant.Name, "playlist.m3u8") + "\n")
+		// URL-encode variant name to prevent injection in playlist paths
+		sb.WriteString(url.PathEscape(variant.Name) + "/playlist.m3u8\n")
 	}
 
 	return os.WriteFile(manifest.MasterPlaylist, []byte(sb.String()), 0644)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -542,9 +543,16 @@ func getEndpointKey(req *http.Request) string {
 
 // openAPIHandler serves the OpenAPI specification
 func (r *Router) openAPIHandler(w http.ResponseWriter, req *http.Request) {
+	spec, err := os.ReadFile("api/openapi.yaml")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"OpenAPI spec not found"}`))
+		return
+	}
 	w.Header().Set("Content-Type", "application/yaml")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("# OpenAPI specification placeholder\n"))
+	w.Write(spec)
 }
 
 // probeScenariosHandler returns available probe scenarios
@@ -723,6 +731,12 @@ func (r *Router) authMiddleware(next http.Handler) http.Handler {
 				APIKey:  true,
 			}
 			ctx := context.WithValue(req.Context(), userContextKey{}, user)
+			// Also set the shared user context key so GetUserFromContext works
+			ctx = WithUser(ctx, &User{
+				ID:       user.ID,
+				Username: "api-key-user",
+				Role:     user.Role,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 			return
 		}
@@ -735,6 +749,12 @@ func (r *Router) authMiddleware(next http.Handler) http.Handler {
 				IsAdmin: false,
 			}
 			ctx := context.WithValue(req.Context(), userContextKey{}, user)
+			// Also set the shared user context key so GetUserFromContext works
+			ctx = WithUser(ctx, &User{
+				ID:       user.ID,
+				Username: "jwt-user",
+				Role:     user.Role,
+			})
 			next.ServeHTTP(w, req.WithContext(ctx))
 			return
 		}
@@ -865,10 +885,45 @@ type rateLimiter struct {
 
 // newRateLimiter creates a new rate limiter
 func newRateLimiter(limit int, window time.Duration) *rateLimiter {
-	return &rateLimiter{
+	rl := &rateLimiter{
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
+	}
+	// Start periodic cleanup of stale IPs
+	go rl.cleanupLoop()
+	return rl
+}
+
+// cleanupLoop periodically prunes stale IP entries from the rate limiter
+func (rl *rateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		rl.cleanup()
+	}
+}
+
+// cleanup removes IP entries with no recent requests
+func (rl *rateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	windowStart := now.Add(-rl.window)
+
+	for key, requests := range rl.requests {
+		var valid []time.Time
+		for _, t := range requests {
+			if t.After(windowStart) {
+				valid = append(valid, t)
+			}
+		}
+		if len(valid) == 0 {
+			delete(rl.requests, key)
+		} else {
+			rl.requests[key] = valid
+		}
 	}
 }
 

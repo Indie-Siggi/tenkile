@@ -67,23 +67,28 @@ func validatePathForScanning(path string) bool {
 	if path == "" {
 		return false
 	}
-	
-	// Path must be absolute or relative with valid characters
-	// Check for path traversal attempts
-	if strings.Contains(path, "..") {
-		return false
-	}
-	
+
 	// Check for null bytes (common injection attempt)
 	if strings.Contains(path, "\x00") {
 		return false
 	}
-	
-	// Path must exist
-	if info, err := os.Stat(path); err != nil || info.IsDir() {
+
+	// Resolve symlinks to get the real path before validation
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
 		return false
 	}
-	
+
+	// Check for path traversal attempts on the resolved path
+	if strings.Contains(resolved, "..") {
+		return false
+	}
+
+	// Path must exist and not be a directory
+	if info, err := os.Stat(resolved); err != nil || info.IsDir() {
+		return false
+	}
+
 	return true
 }
 
