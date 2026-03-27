@@ -173,6 +173,10 @@ type Router struct {
 	library *LibraryHandler
 	media   *MediaHandler
 	stream  *stream.Handler
+
+	// Phase 7.2 Handlers
+	auth *AuthHandler
+	user *UserHandler
 }
 
 // NewRouter creates a new Chi router with configured middleware and handlers
@@ -230,6 +234,14 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		r.admin.SetDecisionLogger(r.decisionLog)
 	}
 
+	// Initialize auth and user handlers (Phase 7.2)
+	jwtSecret := cfg.Auth.JWTSecret
+	if jwtSecret == "" {
+		jwtSecret = "development-secret-change-in-production"
+	}
+	r.auth = NewAuthHandler(db.DB(), jwtSecret, slog.Default())
+	r.user = NewUserHandler(db.DB(), r.auth)
+
 	// Initialize rate limiter (100 requests per minute for public endpoints)
 	r.rateLimiter = newRateLimiter(100, time.Minute)
 
@@ -279,6 +291,11 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 		// Public endpoints (no auth required)
 		api.Group(func(pub chi.Router) {
 			pub.Get("/openapi.yaml", r.openAPIHandler)
+
+			// Auth endpoints (public)
+			pub.Post("/auth/login", r.auth.Login)
+			pub.Post("/auth/refresh", r.auth.Refresh)
+			pub.Post("/auth/validate-password", r.auth.ValidatePassword)
 
 			// Device probe endpoints with rate limiting and body size limit
 			pub.Group(func(rl chi.Router) {
@@ -351,6 +368,21 @@ func NewRouter(cfg *config.Config, db *database.SQLite, orchestrator *transcode.
 				auth.Get("/stream/hls/playlist", r.stream.ServeHLSManifest)
 				auth.Get("/stream/hls/segment", r.stream.ServeHLSSegment)
 			}
+
+			// Phase 7.2: User management endpoints
+			// Current user endpoints
+			auth.Get("/users/me", r.user.GetCurrentUserProfile)
+			auth.Post("/users/me/change-password", r.user.ChangePassword)
+
+			// Admin user management endpoints
+			auth.Get("/users", r.user.ListUsers)
+			auth.Post("/users", r.user.CreateUser)
+			auth.Get("/users/{id}", r.user.GetUser)
+			auth.Patch("/users/{id}", r.user.UpdateUser)
+			auth.Delete("/users/{id}", r.user.DeleteUser)
+			auth.Post("/users/{id}/lock", r.user.LockUser)
+			auth.Post("/users/{id}/unlock", r.user.UnlockUser)
+			auth.Post("/users/{id}/reset-password", r.user.ChangePassword) // Admin password reset
 
 			// Legacy device endpoints
 			auth.Route("/devices", func(dev chi.Router) {
